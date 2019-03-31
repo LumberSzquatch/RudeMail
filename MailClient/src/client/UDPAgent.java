@@ -35,19 +35,33 @@ public class UDPAgent implements Runnable {
         String responseString;
         while (this.socketOpen) {
             try {
+                // Tasks:
+                // 1) Authenticate user
+                //       a) server should respond accordingly
+                //              - failed auth re-requests creds?
+                //              - only after validation does system ask user for input
+                // 2) Display to user how many unread messages they have and then ask how many they want to read
+                // 3) Validate input and have server respond accordingly
+                // 4) On valid input make three text files based off how many emails user wants to see
+                //       - if becomes too difficult, just say fuck it and throw it all in one file cause it just needs to work
+                // 5) Then just exit because it's not worth it to figure the logic for them to keep requesting (not even in the requirements)
+
+
                 requestString = this.userInput.readLine();
                 sendServerRequest(requestString);
 
                 responseString = receiveServerResponse();
                 System.out.println(responseString);
 
-                if (requestString.toUpperCase().contains(FAREWELL) /*&& serverBidsFarewell(responseString)*/) {
+                if (requestString.equalsIgnoreCase(FAREWELL) /*&& serverBidsFarewell(responseString)*/) {
                     closeSocket();
                 }
                 flushBuffers();
             } catch (IOException ioe) {
                 System.out.println("ERROR! Unexpectedly failed to communicate with server\nClosing connection...");
                 closeSocket();
+                System.out.println("Goodbye");
+                System.exit(-1);
             }
         }
     }

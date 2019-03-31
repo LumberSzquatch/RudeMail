@@ -11,6 +11,7 @@ public class UDPAgent implements Runnable {
     private DatagramSocket datagramSocket;
     private boolean isRunning;
 
+    //TODO: needs two args TCP Port and UDP port
     public UDPAgent(int port) throws SocketException {
         datagramSocket = new DatagramSocket(port);
 //        service = new ResponseService();
