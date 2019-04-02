@@ -9,6 +9,7 @@ public class MailClientRunner {
     // Allowable Port ranges; the range [1, 1023] is not guaranteed
     private static final int MIN_PORT = 1;
     private static final int  MAX_PORT = 65535;
+    private static final String QUIT = "QUIT";
 
     public static void main(String[] args) {
         if (args.length != 2) {
@@ -26,24 +27,25 @@ public class MailClientRunner {
             System.exit(1);
         }
 
-        System.out.println("Application running...");
+        System.out.println("Application running (enter 'QUIT' at any time to exit)...");
 
         Scanner scanner = new Scanner(System.in);
         do {
             System.out.print("Will you be sending or receiving today? ('s' / 'r'): ");
             String response = scanner.next();
-            if (response.equalsIgnoreCase("sending")
-                    || response.equalsIgnoreCase("send")
-                    || response.equalsIgnoreCase("s")) {
-//                TODO: put TCP receiver call here
+            if (responseIsSend(response)) {
+                startTCPSenderAgent(serverHostname, serverPort);
                 System.out.println("Sending not yet functional...");
                 System.exit(0);
             }
 
-            if (response.equalsIgnoreCase("receiving")
-                    || response.equalsIgnoreCase("receive")
-                    || response.equalsIgnoreCase("r")) {
+            if (responseIsReceive(response)) {
                 startUDPReceiverAgent(serverHostname, serverPort);
+                System.exit(0);
+            }
+
+            if (response.equalsIgnoreCase(QUIT)) {
+                System.out.println("Goodbye");
                 System.exit(0);
             }
             System.out.println("Answer could not be understood\n");
@@ -55,13 +57,18 @@ public class MailClientRunner {
             UDPAgent udpAgent = new UDPAgent(host, port);
             udpAgent.run();
         } catch (UnknownHostException | SocketException e) {
-            System.out.println("\nA connection to the host " + host + " on port " + port + " could not be established");
-            System.out.println("What can you do about it?\n" +
-                    "     + Ensure the server application is running\n" +
-                    "     + Ensure the hostname and port number you are connecting to is correct and try again\n" +
-                    "     + ¯\\_(ツ)_/¯");
+            connectionNotEstablishedOutput(host, port);
             System.exit(1);
         }
+    }
+
+    private static void startTCPSenderAgent(String host, int port) {
+//        try {
+//            //TODO: tcp call here
+//        } catch (/*UnknownHostException | SocketException e*/) {
+//            connectionNotEstablishedOutput(host, port);
+//            System.exit(1);
+//        }
     }
 
     private static boolean isPortValid(int port) {
@@ -80,5 +87,26 @@ public class MailClientRunner {
             port = -1;
         }
         return port;
+    }
+
+    private static boolean responseIsSend(String response){
+        return response.equalsIgnoreCase("sending")
+                || response.equalsIgnoreCase("send")
+                || response.equalsIgnoreCase("s");
+    }
+
+    private static boolean responseIsReceive(String response){
+        return response.equalsIgnoreCase("receiving")
+                || response.equalsIgnoreCase("receive")
+                || response.equalsIgnoreCase("r");
+    }
+
+    private static void connectionNotEstablishedOutput(String host, int port) {
+        System.out.println("\nA connection to the host " + host + " on port " + port + " could not be established");
+        System.out.println("What can you do about it?\n" +
+                "     + Ensure the server application is running\n" +
+                "     + Ensure the hostname and port number you are connecting to is correct and try again\n" +
+                "     + Check that the port you provided is the port the intended service is running on, i.e. port for receiving vs. port for sending\n" +
+                "     + ¯\\_(ツ)_/¯");
     }
 }

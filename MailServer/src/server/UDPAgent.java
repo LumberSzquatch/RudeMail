@@ -1,15 +1,18 @@
 package server;
 
 import java.io.IOException;
-import java.net.DatagramPacket;
-import java.net.DatagramSocket;
-import java.net.InetAddress;
-import java.net.SocketException;
+import java.net.*;
+import java.util.Date;
 
 public class UDPAgent implements Runnable {
 
     private DatagramSocket datagramSocket;
     private boolean isRunning;
+
+    private static final String HTTP_VERSION = "HTTP/1.1";
+    private static final byte[] HTTP_200 = "200 OK".getBytes();
+    private static final byte[] HTTP_400 = "400 Bad Request".getBytes();
+    private static final byte[] HTTP_404 = "404 Not Found".getBytes();
 
     //TODO: needs two args TCP Port and UDP port
     public UDPAgent(int port) throws SocketException {
@@ -21,15 +24,15 @@ public class UDPAgent implements Runnable {
     @Override
     public void run() {
         spinUp();
-        System.out.println("Server ready to receive...");
+        System.out.println("UDP agent ready to receive");
         while (this.isRunning) {
             try {
                 byte[] inputBuffer = new byte[2048];
 
                 DatagramPacket clientRequestPacket = inboundPacketFrom(inputBuffer);
                 String requestString = receiveClientRequest(clientRequestPacket);
-                System.out.println("Recieved request: " + requestString);
-                String serverResponse = "I'm alive"; //service.getResponse(requestString, clientRequestPacket.getAddress());
+                System.out.println("Received request: " + requestString);
+                String serverResponse = testResponse(); //service.getResponse(requestString, clientRequestPacket.getAddress());
                 sendServerResponse(
                         convertToBytes(serverResponse),
                         getClientIP(clientRequestPacket),
@@ -40,6 +43,19 @@ public class UDPAgent implements Runnable {
                 e.printStackTrace();
             }
         }
+    }
+
+    private String testResponse() throws UnknownHostException {
+        String responseHeader
+                = HTTP_VERSION + " " + new String(HTTP_200) + "\n"
+                + "Server: " + InetAddress.getLocalHost() + "\n"
+                + "Last-Modified: " + new Date() + "\n"
+                + "Count: " + 1 + "\n"
+                + "Content-Type: text/plain" + "\n"
+                + "Message: " + 1 + "\n\n";
+        String response = "Hey look at this you stupid bitch,\n This pretty much what the user should see, don't fuck it up\n" +
+                "Yours Truly,\nSome Mother fucker";
+        return responseHeader + response;
     }
 
     private String receiveClientRequest(DatagramPacket clientRequest) throws IOException {

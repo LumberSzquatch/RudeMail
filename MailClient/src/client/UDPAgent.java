@@ -10,16 +10,23 @@ public class UDPAgent implements Runnable {
     private BufferedReader userInput;
     private DatagramSocket datagramSocket;
     private InetAddress clientIP;
+    private String serverHostname;
     private int serverPort;
     private byte[] inputBuffer;
     private byte[] outputBuffer;
     private boolean socketOpen;
 
-    private static final String FAREWELL = "BYE";
+    private static final String QUIT = "QUIT";
 
-    public UDPAgent(String serverName, int serverPort) throws SocketException, UnknownHostException {
+    // Timeout values for DatagramSocket; Server has 10 sec. to respond
+    //     after response set back to 0 (which indicates infinite timeout)
+    private static final int REQUEST_TIMEOUT = 10000;
+    private static final int INFINITE_TIMEOUT = 0;
+
+    public UDPAgent(String serverHostname, int serverPort) throws SocketException, UnknownHostException {
         datagramSocket = new DatagramSocket();
-        clientIP = InetAddress.getByName(serverName);
+        clientIP = InetAddress.getByName(serverHostname);
+        this.serverHostname = serverHostname;
         this.serverPort = serverPort;
         inputBuffer = new byte[2048];
         outputBuffer = new byte[2048];
@@ -30,9 +37,12 @@ public class UDPAgent implements Runnable {
     public void run() {
         setSocketOpen();
         initializeInputReader();
-        System.out.println("Server ready for requests...");
         String requestString;
         String responseString;
+
+        System.out.println("Connected to " + serverHostname + ". Ready to retrieve (enter 'QUIT' at anytime to exit)...\n" +
+                "Please log in before we continue...");
+        System.out.println("AUTH: Do auth login here; can set file location based on username (i.e. db/username/*.mail)");
         while (this.socketOpen) {
             try {
                 // Tasks:
@@ -45,23 +55,24 @@ public class UDPAgent implements Runnable {
                 // 4) On valid input make three text files based off how many emails user wants to see
                 //       - if becomes too difficult, just say fuck it and throw it all in one file cause it just needs to work
                 // 5) Then just exit because it's not worth it to figure the logic for them to keep requesting (not even in the requirements)
+                System.out.println("How many email would you like to receive? (requesting for more email than you have will fetch all email): ");
 
 
                 requestString = this.userInput.readLine();
+                closeIfUserQuit(requestString);
                 sendServerRequest(requestString);
 
                 responseString = receiveServerResponse();
                 System.out.println(responseString);
 
-                if (requestString.equalsIgnoreCase(FAREWELL) /*&& serverBidsFarewell(responseString)*/) {
-                    closeSocket();
-                }
                 flushBuffers();
-            } catch (IOException ioe) {
-                System.out.println("ERROR! Unexpectedly failed to communicate with server\nClosing connection...");
-                closeSocket();
-                System.out.println("Goodbye");
-                System.exit(-1);
+
+            } catch (Exception e) {
+                if (!(e instanceof SocketTimeoutException)) {
+                    errorInducedShutdown();
+                }
+                System.out.println("WARNING! Your request to the server incurred a timeout. " +
+                        "Ensure the server is running and try again (or enter 'QUIT' to exit)");
             }
         }
     }
@@ -83,7 +94,11 @@ public class UDPAgent implements Runnable {
      */
     private String receiveServerResponse() throws IOException {
         DatagramPacket serverResponsePacket = inboundPacketFrom(this.inputBuffer);
+
+        // Add timeout property to the datagram; Reset back
+        this.datagramSocket.setSoTimeout(REQUEST_TIMEOUT);
         this.datagramSocket.receive(serverResponsePacket);
+        this.datagramSocket.setSoTimeout(INFINITE_TIMEOUT);
         return convertToString(serverResponsePacket.getData());
     }
 
@@ -126,8 +141,19 @@ public class UDPAgent implements Runnable {
         this.outputBuffer = new byte[2048];
     }
 
-    private boolean serverBidsFarewell(String response) {
-        return response.contains(FAREWELL);
+    private void closeIfUserQuit(String requestString) {
+        if (requestString.equalsIgnoreCase(QUIT)) {
+            closeSocket();
+            System.out.println("Goodbye");
+            System.exit(0);
+        }
+    }
+
+    private void errorInducedShutdown(){
+        System.out.println("ERROR! Unexpectedly failed to communicate input/output with server\nClosing connection...");
+        closeSocket();
+        System.out.println("Goodbye");
+        System.exit(-1);
     }
 
     //Breaks input loop and kills the socket after input of 'bye'

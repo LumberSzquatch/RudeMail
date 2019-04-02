@@ -17,11 +17,6 @@ public class MailServer {
     private static final int  MAX_PORT = 65535;
     public static void main(String[] args) throws SocketException {
 
-//        //TODO: needs two args TCP Port and UDP port
-//        UDPAgent udpAgent = new UDPAgent(port);
-//        new Thread(udpAgent).start();
-
-
         if (args.length < 2) {
             System.out.println("Invalid argument length; Expected 2 but was given " + args.length + "; see below for valid arguments\n" +
                     "Expected input: \"java -jar MailServer.jar <tcp-listen-port> (<udp-listen-port>)\"\n" +
@@ -33,43 +28,52 @@ public class MailServer {
 
         int forTCP = Integer.parseInt(args[0]);
         int forUDP = Integer.parseInt(args[1]);
-        if (!isPortValid(forTCP)) {
-            System.out.println("Use a valid port number if you want to the application to run");
+        checkPortValidity(forTCP, forUDP);
+
+        initializeDumbDBMS();
+        spinUpTCPAgent(forTCP);
+        spinUpUDPAgent(forUDP);
+    }
+
+    private static void checkPortValidity(int tcpPort, int udpPort) {
+        if (isPortInvalid(tcpPort)) {
+            System.out.println("Use a valid TCP port");
             System.exit(1);
         }
 
-
-        if (!isPortValid(forUDP)) {
-            System.out.println("Use a valid port number if you want to the application to run");
+        if (isPortInvalid(udpPort)) {
+            System.out.println("Use a valid UDP port");
             System.exit(1);
         }
 
-        if (portsAreEqual(forTCP, forUDP)) {
+        if (portsAreEqual(tcpPort, udpPort)) {
             System.err.println("Invalid arguments; tcp-listen-port and udp-listen-port CANNOT use the same port number!\n" +
                     "Use unique TCP and UDP port numbers within the range [1, 65535] if you want the application to run");
             System.exit(1);
         }
-
-        // Start the Database service.
-//        MailDBMS.init();
-
-        // Start the TCP service.
-//        new Thread(new TcpService(TCP_PORT)).start();
-
-        // Start the UDP service.
-//        new Thread(new UdpService(UDP_PORT)).start();
-
     }
 
-    private static boolean isPortValid(int port) {
-        if (port >= MIN_PORT && port <= MAX_PORT) {
+    private static boolean isPortInvalid(int port) {
+        if (port < MIN_PORT || port > MAX_PORT) {
+            System.out.println("The port " + port + " is invalid; valid port numbers range from 1 to 65535");
             return true;
         }
-        System.out.println("Invalid port; valid port numbers range from 1 to 65535");
         return false;
     }
 
     private static boolean portsAreEqual(int port, int portToCompare) {
         return port == portToCompare;
+    }
+
+    private static void spinUpTCPAgent(int port) throws SocketException {
+
+    }
+
+    private static void spinUpUDPAgent(int port) throws SocketException {
+        new Thread(new UDPAgent(port)).start();
+    }
+
+    private static void initializeDumbDBMS(){
+
     }
 }
