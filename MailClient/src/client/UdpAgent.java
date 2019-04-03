@@ -5,7 +5,7 @@ import java.io.IOException;
 import java.io.InputStreamReader;
 import java.net.*;
 
-public class UDPAgent implements Runnable {
+public class UdpAgent implements Runnable {
 
     private BufferedReader userInput;
     private DatagramSocket datagramSocket;
@@ -25,7 +25,7 @@ public class UDPAgent implements Runnable {
 
     private String validatedUsername;
 
-    public UDPAgent(String serverHostname, int serverPort) throws SocketException, UnknownHostException {
+    public UdpAgent(String serverHostname, int serverPort) throws SocketException, UnknownHostException {
         datagramSocket = new DatagramSocket();
         clientIP = InetAddress.getByName(serverHostname);
         this.serverHostname = serverHostname;
@@ -47,20 +47,12 @@ public class UDPAgent implements Runnable {
         System.out.println("AUTH: Do auth login here; can set file location based on username (i.e. db/username/*.mail)\n" +
                 "Continuing as cheese...");
 
-        validatedUsername = "cheese"; // todo: make this get set based on how server responds
+        validatedUsername = "userdownload"; // todo: make this get set based on how server responds
         Downloader.initReceiverFolder(validatedUsername);
 
         while (this.socketOpen) {
             try {
-                // Tasks:
-                // 1) Authenticate user
-                //       a) server should respond accordingly
-                //              - failed auth re-requests creds?
-                //              - only after validation does system ask user for input
-                // 3) Validate input and have server respond accordingly
-                // 4) On valid input make stuff all emails into one file (fuck it)
-                // 5) Then just exit because it's not worth it to figure the logic for them to keep requesting (not even in the requirements)
-                System.out.println("How many email would you like to receive? (requesting for more email than you have will fetch all email): ");
+                System.out.println("How many emails and from who should be retrieved? (use format 'count:username')");
 
                 String userResponse = this.userInput.readLine();
                 closeIfUserQuit(userResponse);
@@ -90,8 +82,11 @@ public class UDPAgent implements Runnable {
      * Since authentication tells us what the receiving user is and the user says how many emails they want
      * after being prompted by the application, we can construct or HTTP request and send it to the server
      */
-    private String constructHttpGetRequest(String count) {
-        return "GET db/" + this.validatedUsername + "/ HTTP/1.1\n" +
+    private String constructHttpGetRequest(String request) {
+        String[] userAndCount = request.split(":");
+        String user = userAndCount[1];
+        String count = userAndCount[0];
+        return "GET db/" + user + "/ HTTP/1.1\n" +
                 "Host:" + this.serverHostname + "\n" +
                 "Count:" + count + "\n";
     }

@@ -3,13 +3,13 @@ package server;
 import java.io.IOException;
 import java.net.*;
 
-public class UDPAgent implements Runnable {
+public class UdpAgent implements Runnable {
 
     private DatagramSocket datagramSocket;
     private HttpValidator httpValidator;
     private boolean isRunning;
 
-    public UDPAgent(int port) throws SocketException {
+    public UdpAgent(int port) throws SocketException {
         datagramSocket = new DatagramSocket(port);
         httpValidator = new HttpValidator();
         isRunning = false;
@@ -25,7 +25,7 @@ public class UDPAgent implements Runnable {
                 System.out.println("cheese validated as user");
                 String user = "cheese";
                 byte[] inputBuffer = new byte[2048];
-
+                IncidentManager.log("blah", "blah", "blah", "blah");
                 DatagramPacket clientRequestPacket = inboundPacketFrom(inputBuffer);
                 String requestString = receiveClientRequest(clientRequestPacket);
 

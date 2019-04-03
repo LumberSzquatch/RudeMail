@@ -39,7 +39,7 @@ public class Email {
     }
 
     public String getRecipientField() {
-        return recipientField;
+        return recipientField.split("@")[0];
     }
 
     public void setRecipientField(String recipientField) {
