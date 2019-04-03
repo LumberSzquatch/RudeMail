@@ -7,6 +7,7 @@ import java.util.Date;
 public class TcpClientManager implements Runnable {
 
     private final int TCP_PORT;
+    private final boolean serverActiveListenForClients = true;
 
     public TcpClientManager(final int TCP_PORT) {
         this.TCP_PORT = TCP_PORT;
@@ -15,19 +16,13 @@ public class TcpClientManager implements Runnable {
     @Override
     public void run() {
         try {
-            // Setup the welcoming socket.
+            // init new client socket
             ServerSocket serverSocket = new ServerSocket(TCP_PORT);
 
-            // Notify the service has been setup successfully.
-            System.out.println(
-                    "Starting TCP service at: " + new Date() + '\n'
-                            + "TCP service connected to port: "
-                            + serverSocket.getLocalPort());
+            System.out.println("TCP agent listening for incoming clients on port " + serverSocket.getLocalPort());
 
-            // Listen for new clients; put each new client on its own thread.
-            while (true) {
+            while (serverActiveListenForClients) {
                 TcpClient tcpClient = new TcpClient(serverSocket.accept());
-                System.out.println("TcpClient detected. Attempting to setup thread.");
                 new Thread(new TcpAgent(tcpClient)).start();
             }
         } catch (IOException ex) {

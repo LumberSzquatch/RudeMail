@@ -59,7 +59,7 @@ public class TcpClient {
         return socket;
     }
 
-    public Object readObject() throws IOException {
+    public Object readFromClient() throws IOException {
         try {
             return inputStream.readObject();
         } catch (ClassNotFoundException ex) {
@@ -69,7 +69,7 @@ public class TcpClient {
         return new Object();
     }
 
-    public void writeObject(Object o) {
+    public void writeToClient(Object o) {
         try {
             outputStream.writeObject(o);
         } catch (IOException ex) {
