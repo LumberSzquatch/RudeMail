@@ -25,11 +25,11 @@ public class TcpAgent implements Runnable {
             new Thread(new TcpReceiver(multithreadedClient)).start();
             Scanner scanner = new Scanner(System.in);
             while (true) {
-                multithreadedClient.writeObject(scanner.nextLine());
+                multithreadedClient.sendToServer(scanner.nextLine());
             }
 
         } catch (IOException ex) {
-            System.err.println("Failed to connect to host.");
+            System.err.println("Failed to establish connection with server");
             System.exit(1);
         }
     }

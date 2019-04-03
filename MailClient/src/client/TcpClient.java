@@ -29,22 +29,22 @@ public class TcpClient extends Socket {
         initializeIOStreams();
     }
 
-    public Object readObject() throws IOException {
+    public Object readFromServer() throws IOException {
         try {
             return inputStream.readObject();
         } catch (ClassNotFoundException ex) {
             System.err.println(
-                    "Failed to read object from host.");
+                    "Failed to retrieve data from input stream");
         }
         return new Object();
     }
 
-    public void writeObject(Object o) {
+    public void sendToServer(Object o) {
         try {
             outputStream.writeObject(o);
         } catch (IOException ex) {
             System.err.println(
-                    "Failed to write object to host.");
+                    "Failed to write data to output stream");
         }
     }
 

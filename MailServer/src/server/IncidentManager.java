@@ -22,15 +22,15 @@ public class IncidentManager {
 
     public static void log(String fromIp, String toIp, String protocolCommand, String messageCode) {
 
-        File downloadFolder = new File("logs");
-        if (!downloadFolder.exists()) {
-            downloadFolder.mkdir();
+        File logFolder = new File("logs");
+        if (!logFolder.exists()) {
+            logFolder.mkdir();
         }
 
-        File download = new File("logs" + LOG_FILE);
+        File log = new File("logs" + LOG_FILE);
 
-        try (PrintWriter printWriter = new PrintWriter(download)) {
-            printWriter.println(new Date() + ": "
+        try (PrintWriter printWriter = new PrintWriter(log)) {
+            printWriter.append(new Date() + ": "
                     + fromIp
                     + " "
                     + toIp
@@ -42,21 +42,5 @@ public class IncidentManager {
         } catch (FileNotFoundException ex) {
             System.err.println("Failed to write to log file");
         }
-
-//        File download = new File(LOG_FILE);
-//
-//        try (PrintWriter printWriter = new PrintWriter(download)) {
-//            printWriter.println(new Date() + ": "
-//                    + fromIp
-//                    + " "
-//                    + toIp
-//                    + " "
-//                    + protocolCommand
-//                    + " "
-//                    + messageCode);
-//            printWriter.close();
-//        } catch (FileNotFoundException ex) {
-//            System.err.println("Failed to download content .txt file");
-//        }
     }
 }

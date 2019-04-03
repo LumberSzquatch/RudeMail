@@ -44,8 +44,6 @@ public class UdpAgent implements Runnable {
 
         System.out.println("Connected to " + this.serverHostname + ". Ready to retrieve (enter 'QUIT' at anytime to exit)...\n" +
                 "Please log in before we continue...");
-        System.out.println("AUTH: Do auth login here; can set file location based on username (i.e. db/username/*.mail)\n" +
-                "Continuing as cheese...");
 
         validatedUsername = "userdownload"; // todo: make this get set based on how server responds
         Downloader.initReceiverFolder(validatedUsername);

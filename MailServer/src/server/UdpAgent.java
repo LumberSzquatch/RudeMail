@@ -22,14 +22,11 @@ public class UdpAgent implements Runnable {
         while (this.isRunning) {
             try {
 
-                System.out.println("cheese validated as user");
-                String user = "cheese";
+                System.out.println("testuser validated as user");
+                String user = "testuser";
                 byte[] inputBuffer = new byte[2048];
-                IncidentManager.log("blah", "blah", "blah", "blah");
                 DatagramPacket clientRequestPacket = inboundPacketFrom(inputBuffer);
                 String requestString = receiveClientRequest(clientRequestPacket);
-
-                System.out.println("Received request: " + requestString); // todo: perferct canidate for logging
 
                 String serverResponse = this.httpValidator.validatedResponse(requestString);
                 sendServerResponse(
@@ -37,6 +34,10 @@ public class UdpAgent implements Runnable {
                         getClientIP(clientRequestPacket),
                         getClientPort(clientRequestPacket)
                 );
+                IncidentManager.log(clientRequestPacket.getAddress().getHostAddress(),
+                        InetAddress.getLocalHost().getHostAddress(),
+                        requestString,
+                        serverResponse);
             } catch (IOException e) {
                 System.err.println("Server encountered an unexpected due to an input/output error:");
                 e.printStackTrace();
