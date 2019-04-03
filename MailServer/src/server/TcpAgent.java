@@ -125,14 +125,14 @@ public class TcpAgent implements Runnable {
     }
 
     private boolean requestDataInSequence(String request) {
-        return request.equalsIgnoreCase("DATA");
+        return request.equalsIgnoreCase(SMTP_DATA);
     }
 
     private boolean isRequestInvalid(String request) {
-        return !(request.equalsIgnoreCase("HELO")
-                || request.toUpperCase().startsWith("MAIL FROM:")
-                || request.toUpperCase().startsWith("RCPT TO:")
-                || request.equalsIgnoreCase("DATA")
+        return !(request.equalsIgnoreCase(SMTP_HELO)
+                || request.toUpperCase().startsWith(SMTP_MAIL_FROM)
+                || request.toUpperCase().startsWith(SMTP_MAIL_TO)
+                || request.equalsIgnoreCase(SMTP_DATA)
                 || request.endsWith("\n.\n"));
     }
 }

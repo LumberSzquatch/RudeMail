@@ -1,12 +1,62 @@
 package server;
 
+import java.io.File;
+import java.io.FileNotFoundException;
+import java.io.PrintWriter;
+import java.util.Date;
+
 public class IncidentManager {
 
-    public IncidentManager() {
+    private static final String LOG_FILE = "/.server_log";
 
+    public IncidentManager() {
+        File directory = new File("logs");
+        if (!directory.exists()) {
+            directory.mkdir();
+        }
     }
 
     public static void initializeSIM() {
         IncidentManager sim = new IncidentManager();
+    }
+
+    public static void log(String fromIp, String toIp, String protocolCommand, String messageCode) {
+
+        File downloadFolder = new File("logs");
+        if (!downloadFolder.exists()) {
+            downloadFolder.mkdir();
+        }
+
+        File download = new File("logs" + LOG_FILE);
+
+        try (PrintWriter printWriter = new PrintWriter(download)) {
+            printWriter.println(new Date() + ": "
+                    + fromIp
+                    + " "
+                    + toIp
+                    + " "
+                    + protocolCommand
+                    + " "
+                    + messageCode);
+            printWriter.close();
+        } catch (FileNotFoundException ex) {
+            System.err.println("Failed to write to log file");
+        }
+
+//        File download = new File(LOG_FILE);
+//
+//        try (PrintWriter printWriter = new PrintWriter(download)) {
+//            printWriter.println(new Date() + ": "
+//                    + fromIp
+//                    + " "
+//                    + toIp
+//                    + " "
+//                    + protocolCommand
+//                    + " "
+//                    + messageCode);
+//            printWriter.close();
+//        } catch (FileNotFoundException ex) {
+//            System.err.println("Failed to download content .txt file");
+//        }
     }
 }

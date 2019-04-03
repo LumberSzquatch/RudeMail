@@ -39,6 +39,7 @@ public class MailServer {
         checkPortValidity(forTCP, forUDP);
 
         initializeDBMS();
+        initializeSIM();
         spinUpTCPAgent(forTCP);
         spinUpUDPAgent(forUDP);
     }
@@ -83,5 +84,9 @@ public class MailServer {
 
     private static void initializeDBMS() {
         EmailDBMS.initializeDB();
+    }
+
+    private static void initializeSIM() {
+        IncidentManager.initializeSIM();
     }
 }

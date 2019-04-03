@@ -25,7 +25,7 @@ public class UdpAgent implements Runnable {
                 System.out.println("cheese validated as user");
                 String user = "cheese";
                 byte[] inputBuffer = new byte[2048];
-
+                IncidentManager.log("blah", "blah", "blah", "blah");
                 DatagramPacket clientRequestPacket = inboundPacketFrom(inputBuffer);
                 String requestString = receiveClientRequest(clientRequestPacket);
 
