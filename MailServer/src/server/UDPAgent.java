@@ -2,22 +2,16 @@ package server;
 
 import java.io.IOException;
 import java.net.*;
-import java.util.Date;
 
 public class UDPAgent implements Runnable {
 
     private DatagramSocket datagramSocket;
+    private HttpValidator httpValidator;
     private boolean isRunning;
 
-    private static final String HTTP_VERSION = "HTTP/1.1";
-    private static final byte[] HTTP_200 = "200 OK".getBytes();
-    private static final byte[] HTTP_400 = "400 Bad Request".getBytes();
-    private static final byte[] HTTP_404 = "404 Not Found".getBytes();
-
-    //TODO: needs two args TCP Port and UDP port
     public UDPAgent(int port) throws SocketException {
         datagramSocket = new DatagramSocket(port);
-//        service = new ResponseService();
+        httpValidator = new HttpValidator();
         isRunning = false;
     }
 
@@ -27,36 +21,30 @@ public class UDPAgent implements Runnable {
         System.out.println("UDP agent ready to receive");
         while (this.isRunning) {
             try {
+
+                System.out.println("cheese validated as user");
+                String user = "cheese";
                 byte[] inputBuffer = new byte[2048];
 
                 DatagramPacket clientRequestPacket = inboundPacketFrom(inputBuffer);
                 String requestString = receiveClientRequest(clientRequestPacket);
-                System.out.println("Received request: " + requestString);
-                String serverResponse = testResponse(); //service.getResponse(requestString, clientRequestPacket.getAddress());
+
+                System.out.println("Received request: " + requestString); // todo: perferct canidate for logging
+
+                String serverResponse = this.httpValidator.validatedResponse(requestString);
                 sendServerResponse(
                         convertToBytes(serverResponse),
                         getClientIP(clientRequestPacket),
                         getClientPort(clientRequestPacket)
                 );
             } catch (IOException e) {
-                System.out.println("Server encountered an unexpected error:");
+                System.err.println("Server encountered an unexpected due to an input/output error:");
                 e.printStackTrace();
             }
         }
     }
 
-    private String testResponse() throws UnknownHostException {
-        String responseHeader
-                = HTTP_VERSION + " " + new String(HTTP_200) + "\n"
-                + "Server: " + InetAddress.getLocalHost() + "\n"
-                + "Last-Modified: " + new Date() + "\n"
-                + "Count: " + 1 + "\n"
-                + "Content-Type: text/plain" + "\n"
-                + "Message: " + 1 + "\n\n";
-        String response = "Hey look at this you stupid bitch,\n This pretty much what the user should see, don't fuck it up\n" +
-                "Yours Truly,\nSome Mother fucker";
-        return responseHeader + response;
-    }
+
 
     private String receiveClientRequest(DatagramPacket clientRequest) throws IOException {
         this.datagramSocket.receive(clientRequest);

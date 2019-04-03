@@ -22,27 +22,35 @@ public class MailServer {
                     "Expected input: \"java -jar MailServer.jar <tcp-listen-port> (<udp-listen-port>)\"\n" +
                     "Where tcp-listen-port is a valid port number for clients sending mail and " +
                     "udp-listen-port is a valid port number for a client receiving mail\n" +
-                    "The tcp and upd ports must be an integer within the range [1, 65535] and cannot equal each other");
+                    "TCP and UDP listen ports must be an integer within the range [1, 65535] and cannot equal each other");
             System.exit(1);
         }
 
-        int forTCP = Integer.parseInt(args[0]);
-        int forUDP = Integer.parseInt(args[1]);
+        int forTCP = -1;
+        int forUDP = -1;
+        try {
+            forTCP = Integer.parseInt(args[0]);
+            forUDP = Integer.parseInt(args[1]);
+        } catch (NumberFormatException nfe) {
+            System.out.println("TCP and UDP listen ports must be an integer within the range [1, 65535] and cannot equal each other\n" +
+                    "Please provide valid port numbers to run the application...");
+            System.exit(1);
+        }
         checkPortValidity(forTCP, forUDP);
 
-        initializeDumbDBMS();
+        initializeDBMS();
         spinUpTCPAgent(forTCP);
         spinUpUDPAgent(forUDP);
     }
 
     private static void checkPortValidity(int tcpPort, int udpPort) {
         if (isPortInvalid(tcpPort)) {
-            System.out.println("Use a valid TCP port");
+            System.err.println("Use a valid TCP listen port if you want the application to run");
             System.exit(1);
         }
 
         if (isPortInvalid(udpPort)) {
-            System.out.println("Use a valid UDP port");
+            System.err.println("Use a valid UDP listen port if you want the application to run");
             System.exit(1);
         }
 
@@ -55,7 +63,7 @@ public class MailServer {
 
     private static boolean isPortInvalid(int port) {
         if (port < MIN_PORT || port > MAX_PORT) {
-            System.out.println("The port " + port + " is invalid; valid port numbers range from 1 to 65535");
+            System.err.println("The port " + port + " is invalid; valid port numbers range from 1 to 65535");
             return true;
         }
         return false;
@@ -65,15 +73,15 @@ public class MailServer {
         return port == portToCompare;
     }
 
-    private static void spinUpTCPAgent(int port) throws SocketException {
-
+    private static void spinUpTCPAgent(int port) {
+//        new Thread(new TcpService(port)).start();
     }
 
     private static void spinUpUDPAgent(int port) throws SocketException {
         new Thread(new UDPAgent(port)).start();
     }
 
-    private static void initializeDumbDBMS(){
-
+    private static void initializeDBMS() {
+        EmailDBMS.initializeDB();
     }
 }
