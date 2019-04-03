@@ -23,6 +23,9 @@ public class UDPAgent implements Runnable {
     private static final int REQUEST_TIMEOUT = 10000;
     private static final int INFINITE_TIMEOUT = 0;
 
+    private String validatedUsername;
+    private Downloader downloader;
+
     public UDPAgent(String serverHostname, int serverPort) throws SocketException, UnknownHostException {
         datagramSocket = new DatagramSocket();
         clientIP = InetAddress.getByName(serverHostname);
@@ -31,6 +34,7 @@ public class UDPAgent implements Runnable {
         inputBuffer = new byte[2048];
         outputBuffer = new byte[2048];
         socketOpen = false;
+        downloader = new Downloader();
     }
 
     @Override
@@ -40,9 +44,14 @@ public class UDPAgent implements Runnable {
         String requestString;
         String responseString;
 
-        System.out.println("Connected to " + serverHostname + ". Ready to retrieve (enter 'QUIT' at anytime to exit)...\n" +
+        System.out.println("Connected to " + this.serverHostname + ". Ready to retrieve (enter 'QUIT' at anytime to exit)...\n" +
                 "Please log in before we continue...");
-        System.out.println("AUTH: Do auth login here; can set file location based on username (i.e. db/username/*.mail)");
+        System.out.println("AUTH: Do auth login here; can set file location based on username (i.e. db/username/*.mail)\n" +
+                "Continuing as cheese...");
+
+        validatedUsername = "cheese"; // todo: make this get set based on how server responds
+        downloader.initReceiverFolder(validatedUsername);
+
         while (this.socketOpen) {
             try {
                 // Tasks:
@@ -50,21 +59,22 @@ public class UDPAgent implements Runnable {
                 //       a) server should respond accordingly
                 //              - failed auth re-requests creds?
                 //              - only after validation does system ask user for input
-                // 2) Display to user how many unread messages they have and then ask how many they want to read
                 // 3) Validate input and have server respond accordingly
-                // 4) On valid input make three text files based off how many emails user wants to see
-                //       - if becomes too difficult, just say fuck it and throw it all in one file cause it just needs to work
+                // 4) On valid input make stuff all emails into one file (fuck it)
                 // 5) Then just exit because it's not worth it to figure the logic for them to keep requesting (not even in the requirements)
                 System.out.println("How many email would you like to receive? (requesting for more email than you have will fetch all email): ");
 
-
-                requestString = this.userInput.readLine();
+                String userResponse = this.userInput.readLine();
+                requestString = constructHttpGetRequest(userResponse);
                 closeIfUserQuit(requestString);
                 sendServerRequest(requestString);
 
                 responseString = receiveServerResponse();
-                System.out.println(responseString);
-
+                // todo: check that the response string is a successful GET; if so download to user folder
+                if (true) {
+                    downloader.downloadToFolder(responseString);
+                }
+                System.out.println(responseString); // todo: good candidate for logging
                 flushBuffers();
 
             } catch (Exception e) {
@@ -78,12 +88,23 @@ public class UDPAgent implements Runnable {
     }
 
     /*
+     *
+     * Since authentication tells us what the receiving user is and the user says how many emails they want
+     * after being prompted by the application, we can construct or HTTP request and send it to the server
+     */
+    private String constructHttpGetRequest(String count) {
+        return "GET db/" + this.validatedUsername + "/ HTTP/1.1\n" +
+                "Host:" + this.serverHostname + "\n" +
+                "Count:" + count;
+    }
+
+    /*
      * Captures user entered input and converts it a byte array and stores the result in the output buffer;
      * .send() is then called on the socket given a packet created from the buffer;
      * Is dependent on convertToBytes(String) and outboundPacketFrom(byte[]) methods
      */
-    private void sendServerRequest(String input) throws IOException {
-        this.outputBuffer = convertToBytes(input);
+    private void sendServerRequest(String request) throws IOException {
+        this.outputBuffer = convertToBytes(request);
         this.datagramSocket.send(outboundPacketFrom(outputBuffer));
     }
 
@@ -150,7 +171,7 @@ public class UDPAgent implements Runnable {
     }
 
     private void errorInducedShutdown(){
-        System.out.println("ERROR! Unexpectedly failed to communicate input/output with server\nClosing connection...");
+        System.err.println("ERROR! Unexpectedly failed to communicate input/output with server\nClosing connection...");
         closeSocket();
         System.out.println("Goodbye");
         System.exit(-1);

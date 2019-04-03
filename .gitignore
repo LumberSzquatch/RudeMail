@@ -2,9 +2,13 @@
 *.class
 *.iml
 *.log
+*.MF
 .idea
+out
+META-INF
 
 # Package Files #
 *.jar
 *.war
 *.ear
+

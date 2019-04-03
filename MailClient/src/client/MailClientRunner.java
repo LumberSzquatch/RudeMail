@@ -1,5 +1,6 @@
 package client;
 
+import java.io.IOException;
 import java.net.SocketException;
 import java.net.UnknownHostException;
 import java.util.Scanner;
@@ -35,7 +36,6 @@ public class MailClientRunner {
             String response = scanner.next();
             if (responseIsSend(response)) {
                 startTCPSenderAgent(serverHostname, serverPort);
-                System.out.println("Sending not yet functional...");
                 System.exit(0);
             }
 
@@ -69,13 +69,14 @@ public class MailClientRunner {
 //            connectionNotEstablishedOutput(host, port);
 //            System.exit(1);
 //        }
+//        runSenderService(host, port);
     }
 
     private static boolean isPortValid(int port) {
         if (port >= MIN_PORT && port <= MAX_PORT) {
             return true;
         }
-        System.out.println("Invalid port; valid port numbers range from 1 to 65535");
+        System.err.println("Invalid port; valid port numbers range from 1 to 65535");
         return false;
     }
 
@@ -102,11 +103,11 @@ public class MailClientRunner {
     }
 
     private static void connectionNotEstablishedOutput(String host, int port) {
-        System.out.println("\nA connection to the host " + host + " on port " + port + " could not be established");
-        System.out.println("What can you do about it?\n" +
+        System.err.println("\nA connection to the host " + host + " on port " + port + " could not be established");
+        System.err.println("What can you do about it?\n" +
                 "     + Ensure the server application is running\n" +
                 "     + Ensure the hostname and port number you are connecting to is correct and try again\n" +
                 "     + Check that the port you provided is the port the intended service is running on, i.e. port for receiving vs. port for sending\n" +
-                "     + ¯\\_(ツ)_/¯");
+                "     + ¯\\_(-.-)_/¯");
     }
 }
