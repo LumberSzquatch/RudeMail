@@ -1,15 +1,18 @@
 package server;
 
 import java.io.IOException;
+import java.util.Date;
 
 public class TcpAgent implements Runnable {
 
     private final TcpClient tcpClient;
 
     private final static String SMTP_HELO = "HELO";
-    private final static String SMTP_MAIL_TO = "MAIL TO:";
+    private final static String SMTP_MAIL_FROM = "MAIL FROM:";
+    private final static String SMTP_MAIL_TO = "RCPT TO:";
     private final static String SMTP_DATA = "DATA:";
     private final static String SMTP_OK = "250 OK";
+    private final static String SMTP_START_INPUT = "354 Start mail input; end with <CRLF>.<CRLF>";
     private final static String SMTP_SERVER_READY = "220 Domain Server Ready";
     private final static String SMTP_GOODBYE = "221 Goodbye";
     private final static String SMTP_INVALID = "500 Invalid Command";
@@ -28,65 +31,45 @@ public class TcpAgent implements Runnable {
                             + tcpClient.getSocket().getInetAddress().getHostAddress()
                             + " | Name: "
                             + tcpClient.getCustomName());
-
-//                Mail mail = new Mail();
-
-            // Begin SMTP service. Handle incoming data from tcpClient.
-            tcpClient.writeObject(SMTP_SERVER_READY);
-
-            String message;
+            communicateServerReady();
+            Email email = new Email();
+            String request;
             while (tcpClient.getSocket().isConnected()) {
 
-                message = (String) tcpClient.readObject();
-                if (message.equalsIgnoreCase("HELO")) {
-                    // parse the sender's FQDN (use InetAddress) or IP.
-                    // TODO this is not a requirement, ignore for now..
+                request = getClientRequest();
+                if (request.equalsIgnoreCase(SMTP_HELO)) {
                     tcpClient.writeObject("250 Hello");
 
-                    message = (String) tcpClient.readObject();
-                    if (message.toUpperCase().startsWith("MAIL FROM:")) {
-                        // parse the sender's email addr and reply.
-//                        mail.setMailFrom(message.substring(10).trim());
-                        tcpClient.writeObject("250 OK");
+                    request = (String) tcpClient.readObject();
+                    if (requestMailFromInSequence(request)) {
+                        email.setFromField(parseAddressFromRequest(request));
+                        communicateOK();
 
-                        message = (String) tcpClient.readObject();
-                        if (message.toUpperCase().startsWith("RCPT TO:")) {
-                            // parse the recipient's addr and reply.
-//                            mail.setRcptTo(message.substring(8).trim());
-                            tcpClient.writeObject("250 OK");
+                        request = getClientRequest();
+                        if (requestMailToInSequence(request)) {
+                            email.setRecipientField(parseRecipientFromRequest(request));
+                            communicateOK();
 
-                            message = (String) tcpClient.readObject();
-                            if (message.equalsIgnoreCase("DATA")) {
-                                tcpClient.writeObject("354 Send message content; end with <CRLF>.<CRLF>");
-
-                                message = "";
-                                do {
-                                    message += (String) tcpClient.readObject() + "\n";
-                                } while (!message.endsWith("\n.\n"));
-
-                                // commit the data, stamp the time, and save.
-//                                mail.setData(
-//                                        message.substring(0, message.length() - 3)
-//                                );
-//                                mail.setTimeStamp(new Date());
-//
-//                                MailDBMS.save(mail);
-
-                                tcpClient.writeObject("250 OK");
+                            request = getClientRequest();
+                            if (requestDataInSequence(request)) {
+                                tcpClient.writeObject(SMTP_START_INPUT);
+                                request = parseDataFromRequest();
+                                email.setEmailData(
+                                        request.substring(0, request.length() - 3)
+                                );
+                                email.setTimeStamp(new Date());
+                                EmailDBMS.insert(email);
+                                communicateOK();
                             }
                         }
                     }
                 }
 
-                if (message.equalsIgnoreCase("QUIT")) {
-                    tcpClient.writeObject("221 Goodbye");
+                if (request.equalsIgnoreCase("QUIT")) {
+                    tcpClient.writeObject(SMTP_GOODBYE);
                     break;
-                } else if (!(message.equalsIgnoreCase("HELO")
-                        || message.toUpperCase().startsWith("MAIL FROM:")
-                        || message.toUpperCase().startsWith("RCPT TO:")
-                        || message.equalsIgnoreCase("DATA")
-                        || message.endsWith("\n.\n"))) {
-                    tcpClient.writeObject("500 Invalid Command. Restart From HELO.");
+                } else if (isRequestInvalid(request)) {
+                    tcpClient.writeObject(SMTP_INVALID + "Please start from 'HELO'");
                 }
             }
         } catch (IOException ex) {
@@ -105,11 +88,51 @@ public class TcpAgent implements Runnable {
         }
     }
 
-    private boolean isRequestInvalid(String message) {
-        return !(message.equalsIgnoreCase("HELO")
-                || message.toUpperCase().startsWith("MAIL FROM:")
-                || message.toUpperCase().startsWith("RCPT TO:")
-                || message.equalsIgnoreCase("DATA")
-                || message.endsWith("\n.\n"));
+    private void communicateServerReady() {
+        tcpClient.writeObject(SMTP_SERVER_READY);
+    }
+
+    private void communicateOK() {
+        tcpClient.writeObject("250 OK");
+    }
+
+    private String getClientRequest() throws IOException {
+        return (String) tcpClient.readObject();
+    }
+
+    private String parseAddressFromRequest(String request) {
+        return request.substring(10).trim();
+    }
+
+    private String parseRecipientFromRequest(String request) {
+        return request.substring(8).trim();
+    }
+
+    private String parseDataFromRequest() throws IOException {
+        String emailBody = "";
+        do {
+            emailBody += (String) tcpClient.readObject() + "\n";
+        } while (!emailBody.endsWith("\n.\n"));
+        return emailBody;
+    }
+
+    private boolean requestMailFromInSequence(String request) {
+        return request.toUpperCase().startsWith(SMTP_MAIL_FROM);
+    }
+
+    private boolean requestMailToInSequence(String request) {
+        return request.toUpperCase().startsWith(SMTP_MAIL_TO);
+    }
+
+    private boolean requestDataInSequence(String request) {
+        return request.equalsIgnoreCase("DATA");
+    }
+
+    private boolean isRequestInvalid(String request) {
+        return !(request.equalsIgnoreCase("HELO")
+                || request.toUpperCase().startsWith("MAIL FROM:")
+                || request.toUpperCase().startsWith("RCPT TO:")
+                || request.equalsIgnoreCase("DATA")
+                || request.endsWith("\n.\n"));
     }
 }
