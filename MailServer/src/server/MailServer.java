@@ -74,11 +74,11 @@ public class MailServer {
     }
 
     private static void spinUpTCPAgent(int port) {
-//        new Thread(new TcpService(port)).start();
+        new Thread(new TcpClientManager(port)).start();
     }
 
     private static void spinUpUDPAgent(int port) throws SocketException {
-        new Thread(new UDPAgent(port)).start();
+        new Thread(new UdpAgent(port)).start();
     }
 
     private static void initializeDBMS() {

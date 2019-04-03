@@ -5,7 +5,7 @@ import java.io.IOException;
 import java.io.InputStreamReader;
 import java.net.*;
 
-public class UDPAgent implements Runnable {
+public class UdpAgent implements Runnable {
 
     private BufferedReader userInput;
     private DatagramSocket datagramSocket;
@@ -25,7 +25,7 @@ public class UDPAgent implements Runnable {
 
     private String validatedUsername;
 
-    public UDPAgent(String serverHostname, int serverPort) throws SocketException, UnknownHostException {
+    public UdpAgent(String serverHostname, int serverPort) throws SocketException, UnknownHostException {
         datagramSocket = new DatagramSocket();
         clientIP = InetAddress.getByName(serverHostname);
         this.serverHostname = serverHostname;

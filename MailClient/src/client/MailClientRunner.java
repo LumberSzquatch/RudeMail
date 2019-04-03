@@ -54,7 +54,7 @@ public class MailClientRunner {
 
     private static void startUDPReceiverAgent(String host, int port) {
         try {
-            UDPAgent udpAgent = new UDPAgent(host, port);
+            UdpAgent udpAgent = new UdpAgent(host, port);
             udpAgent.run();
         } catch (UnknownHostException | SocketException e) {
             connectionNotEstablishedOutput(host, port);
@@ -63,13 +63,8 @@ public class MailClientRunner {
     }
 
     private static void startTCPSenderAgent(String host, int port) {
-//        try {
-//            //TODO: tcp call here
-//        } catch (/*UnknownHostException | SocketException e*/) {
-//            connectionNotEstablishedOutput(host, port);
-//            System.exit(1);
-//        }
-//        runSenderService(host, port);
+        TcpAgent tcpAgent = new TcpAgent(host, port);
+        tcpAgent.run();
     }
 
     private static boolean isPortValid(int port) {
