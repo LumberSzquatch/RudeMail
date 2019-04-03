@@ -24,7 +24,6 @@ public class UDPAgent implements Runnable {
     private static final int INFINITE_TIMEOUT = 0;
 
     private String validatedUsername;
-    private Downloader downloader;
 
     public UDPAgent(String serverHostname, int serverPort) throws SocketException, UnknownHostException {
         datagramSocket = new DatagramSocket();
@@ -34,7 +33,6 @@ public class UDPAgent implements Runnable {
         inputBuffer = new byte[2048];
         outputBuffer = new byte[2048];
         socketOpen = false;
-        downloader = new Downloader();
     }
 
     @Override
@@ -50,7 +48,7 @@ public class UDPAgent implements Runnable {
                 "Continuing as cheese...");
 
         validatedUsername = "cheese"; // todo: make this get set based on how server responds
-        downloader.initReceiverFolder(validatedUsername);
+        Downloader.initReceiverFolder(validatedUsername);
 
         while (this.socketOpen) {
             try {
@@ -65,14 +63,15 @@ public class UDPAgent implements Runnable {
                 System.out.println("How many email would you like to receive? (requesting for more email than you have will fetch all email): ");
 
                 String userResponse = this.userInput.readLine();
+                closeIfUserQuit(userResponse);
                 requestString = constructHttpGetRequest(userResponse);
-                closeIfUserQuit(requestString);
-                sendServerRequest(requestString);
 
+                sendServerRequest(requestString);
                 responseString = receiveServerResponse();
-                // todo: check that the response string is a successful GET; if so download to user folder
-                if (true) {
-                    downloader.downloadToFolder(responseString);
+
+                // check that the response string is a successful GET; if so download to user folder
+                if (responseOK(responseString)) {
+                    Downloader.downloadToFolder(responseString);
                 }
                 System.out.println(responseString); // todo: good candidate for logging
                 flushBuffers();
@@ -88,14 +87,13 @@ public class UDPAgent implements Runnable {
     }
 
     /*
-     *
      * Since authentication tells us what the receiving user is and the user says how many emails they want
      * after being prompted by the application, we can construct or HTTP request and send it to the server
      */
     private String constructHttpGetRequest(String count) {
         return "GET db/" + this.validatedUsername + "/ HTTP/1.1\n" +
                 "Host:" + this.serverHostname + "\n" +
-                "Count:" + count;
+                "Count:" + count + "\n";
     }
 
     /*
@@ -160,6 +158,10 @@ public class UDPAgent implements Runnable {
     private void flushBuffers() {
         this.inputBuffer = new byte[2048];
         this.outputBuffer = new byte[2048];
+    }
+
+    private boolean responseOK(String response) {
+        return response.startsWith("HTTP/1.1 200 OK");
     }
 
     private void closeIfUserQuit(String requestString) {

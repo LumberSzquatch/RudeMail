@@ -38,7 +38,7 @@ public class MailServer {
         }
         checkPortValidity(forTCP, forUDP);
 
-        initializeDumbDBMS();
+        initializeDBMS();
         spinUpTCPAgent(forTCP);
         spinUpUDPAgent(forUDP);
     }
@@ -81,7 +81,7 @@ public class MailServer {
         new Thread(new UDPAgent(port)).start();
     }
 
-    private static void initializeDumbDBMS() {
-//        MailDBMS.init();
+    private static void initializeDBMS() {
+        EmailDBMS.initializeDB();
     }
 }

@@ -28,7 +28,9 @@ public class UDPAgent implements Runnable {
 
                 DatagramPacket clientRequestPacket = inboundPacketFrom(inputBuffer);
                 String requestString = receiveClientRequest(clientRequestPacket);
+
                 System.out.println("Received request: " + requestString); // todo: perferct canidate for logging
+
                 String serverResponse = this.httpValidator.validatedResponse(requestString);
                 sendServerResponse(
                         convertToBytes(serverResponse),
