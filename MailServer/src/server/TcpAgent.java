@@ -19,12 +19,24 @@ public class TcpAgent implements Runnable {
     private final static String SMTP_GOODBYE = "221 Goodbye";
     private final static String SMTP_INVALID = "500 Invalid Command";
 
+    private final static String AUTH = "AUTH";
+    private final static String INVALID_CREDENTIALS = "535 Invalid Credentials";
+    private final static String USERNAME_CHALLENGE = "334 dXNlcm5hbWU6";
+    private final static String PASSWORD_CHALLENGE = "334 cGFzc3dvcmQ6";
+    private final static String AUTH_SUCCESS = "235 AUTH Success";
+    private final static String EMAIL_DOMAIN = "@cs447.edu";
+
+    private boolean isNewUser;
+    private String clientEmail;
+
     public TcpAgent(TcpClient tcpClient) {
         this.tcpClient = tcpClient;
+        this.isNewUser = false;
     }
 
     @Override
     public void run() {
+        System.out.println("Client " + tcpClient.getSocket().getInetAddress().getHostAddress() + " has established connection");
         try {
             IncidentManager.log(tcpClient.getSocket().getInetAddress().getHostAddress(),
                     InetAddress.getLocalHost().getHostAddress(),
@@ -35,85 +47,182 @@ public class TcpAgent implements Runnable {
             String request;
             while (tcpClient.getSocket().isConnected()) {
 
-                request = getClientRequest();
-                if (request.equalsIgnoreCase(SMTP_HELO)) {
-                    tcpClient.writeToClient("250 Hello");
-                    IncidentManager.log(tcpClient.getSocket().getInetAddress().getHostAddress(),
-                            InetAddress.getLocalHost().getHostAddress(),
-                            SMTP_HELO,
-                            "250 Hello");
-
-                    request = (String) tcpClient.readFromClient();
-                    if (requestMailFromInSequence(request)) {
-                        email.setFromField(parseAddressFromRequest(request));
-                        communicateOK();
-                        IncidentManager.log(tcpClient.getSocket().getInetAddress().getHostAddress(),
-                                InetAddress.getLocalHost().getHostAddress(),
-                                SMTP_MAIL_FROM,
-                                SMTP_OK);
-
-                        request = getClientRequest();
-                        if (requestMailToInSequence(request)) {
-                            email.setRecipientField(parseRecipientFromRequest(request));
-                            communicateOK();
-                            IncidentManager.log(tcpClient.getSocket().getInetAddress().getHostAddress(),
-                                    InetAddress.getLocalHost().getHostAddress(),
-                                    SMTP_MAIL_TO,
-                                    SMTP_OK);
-
-                            request = getClientRequest();
-                            if (requestDataInSequence(request)) {
-                                tcpClient.writeToClient(SMTP_START_INPUT);
-                                request = parseDataFromRequest();
-                                email.setEmailData(
-                                        request.substring(0, request.length() - 3)
-                                );
-                                email.setTimeStamp(new Date());
-                                EmailDBMS.insert(email);
-                                communicateOK();
-                                IncidentManager.log(tcpClient.getSocket().getInetAddress().getHostAddress(),
-                                        InetAddress.getLocalHost().getHostAddress(),
-                                        SMTP_START_INPUT,
-                                        SMTP_OK);
-                            }
+                try {
+                    request = getClientRequest();
+                    while (!request.equalsIgnoreCase(SMTP_HELO)) {
+                        terminateIfClientQuit(request);
+                        if (clientSocketClosed()) {
+                            break;
                         }
+                        tcpClient.writeToClient(SMTP_INVALID + "; I won't help you until you say HELO");
+                        request = getClientRequest();
                     }
-                }
 
-                if (request.equalsIgnoreCase("QUIT")) {
-                    tcpClient.writeToClient(SMTP_GOODBYE);
+                    if (clientSocketClosed()) {
+                        break;
+                    }
+                    greetClient();
+
+                    request = getClientRequest();
+                    while (!request.equalsIgnoreCase(AUTH)) {
+                        terminateIfClientQuit(request);
+                        if (clientSocketClosed()) {
+                            break;
+                        }
+                        tcpClient.writeToClient(SMTP_INVALID + "; I must AUTHorize you before we continue");
+                        request = getClientRequest();
+                    }
+
+                    if (clientSocketClosed()) {
+                        break;
+                    }
+                    tcpClient.writeToClient(USERNAME_CHALLENGE);
                     IncidentManager.log(tcpClient.getSocket().getInetAddress().getHostAddress(),
                             InetAddress.getLocalHost().getHostAddress(),
-                            "QUIT",
-                            SMTP_GOODBYE);
-                    break;
-                } else if (isRequestInvalid(request)) {
-                    tcpClient.writeToClient(SMTP_INVALID + "Please start from 'HELO'");
+                            AUTH,
+                            USERNAME_CHALLENGE);
+
+                    request = getClientRequest();
+                    // todo: decode b64 request
+                    while (!request.contains(EMAIL_DOMAIN)) {
+                        terminateIfClientQuit(request);
+                        if (clientSocketClosed()) {
+                            break;
+                        }
+                        tcpClient.writeToClient(INVALID_CREDENTIALS + "; Not a valid email");
+                        request = getClientRequest();
+                        // todo: decode b64 request
+                    }
+
+
+                    this.clientEmail = B64Authorizer.decode(request);
+                    // TODO://////////////////////////////////////////////////
+                    // if email not in .user_pass file => isNewUser = true
+                    // start new sequence/while loop of registering new user
+                    // TODO://////////////////////////////////////////////////
+
+
+                    int loginAttempts = 4;
+                    tcpClient.writeToClient(PASSWORD_CHALLENGE);
                     IncidentManager.log(tcpClient.getSocket().getInetAddress().getHostAddress(),
                             InetAddress.getLocalHost().getHostAddress(),
-                            request,
-                            SMTP_INVALID);
+                            AUTH,
+                            PASSWORD_CHALLENGE);
+                    request = getClientRequest();
+                    // todo: decode b64 request
+                    while (!B64Authorizer.passwordValid(request)) {
+                        terminateIfClientQuit(request);
+                        loginAttempts--;
+                        if (loginAttempts == 0) {
+                            tcpClient.writeToClient(INVALID_CREDENTIALS + "; Maximum login attempts exceeded, connection terminating...");
+                            bidFarewell();
+                            terminateClientConnection();
+                        }
+                        if (clientSocketClosed()) {
+                            break;
+                        }
+                        tcpClient.writeToClient(INVALID_CREDENTIALS + "; Password does not match what is on file ("
+                                + loginAttempts + " attempts remaining before termination)");
+                        request = getClientRequest();
+                        // todo: decode b64 request
+                    }
+
+                    if (clientSocketClosed()) {
+                        break;
+                    }
+                    tcpClient.writeToClient(AUTH_SUCCESS + "; You may now continue with mail commands");
+                    IncidentManager.log(tcpClient.getSocket().getInetAddress().getHostAddress(),
+                            InetAddress.getLocalHost().getHostAddress(),
+                            AUTH,
+                            AUTH_SUCCESS);
+
+                    request = getClientRequest();
+                    System.out.println(request.toUpperCase().startsWith(SMTP_MAIL_FROM) && request.contains(this.clientEmail));
+                    while (!validMailFrom(request)) {
+                        System.out.println(request.toUpperCase().startsWith(SMTP_MAIL_FROM) && request.contains(this.clientEmail));
+                        terminateIfClientQuit(request);
+                        if (clientSocketClosed()) {
+                            break;
+                        }
+                        tcpClient.writeToClient(SMTP_INVALID + "; You must specify 'MAIL FROM: yourEmail@cs447.edu'");
+                        request = getClientRequest();
+                    }
+
+                    if (clientSocketClosed()) {
+                        break;
+                    }
+                    email.setFromField(parseAddressFromRequest(request));
+                    communicateOK();
+                    IncidentManager.log(tcpClient.getSocket().getInetAddress().getHostAddress(),
+                            InetAddress.getLocalHost().getHostAddress(),
+                            SMTP_MAIL_FROM,
+                            SMTP_OK);
+
+                    request = getClientRequest();
+                    while (!validMailTo(request)) {
+                        terminateIfClientQuit(request);
+                        if (clientSocketClosed()) {
+                            break;
+                        }
+                        tcpClient.writeToClient(SMTP_INVALID + "; You must specify 'RCPT TO: recipient@cs447.edu'");
+                        request = getClientRequest();
+                    }
+
+                    if (clientSocketClosed()) {
+                        break;
+                    }
+                    email.setRecipientField(parseRecipientFromRequest(request));
+                    communicateOK();
+                    IncidentManager.log(tcpClient.getSocket().getInetAddress().getHostAddress(),
+                            InetAddress.getLocalHost().getHostAddress(),
+                            SMTP_MAIL_TO,
+                            SMTP_OK);
+
+                    request = getClientRequest();
+                    while (!validData(request)) {
+                        terminateIfClientQuit(request);
+                        if (clientSocketClosed()) {
+                            break;
+                        }
+                        tcpClient.writeToClient(SMTP_INVALID + "; I need to know what DATA you are sending");
+                        request = getClientRequest();
+                    }
+
+                    if (clientSocketClosed()) {
+                        break;
+                    }
+                    tcpClient.writeToClient(SMTP_START_INPUT);
+                    request = parseDataFromRequest();
+                    email.setEmailData(
+                            request.substring(0, request.length() - 3)
+                    );
+                    email.setTimeStamp(new Date());
+                    EmailDBMS.insert(email);
+                    communicateOK();
+                    IncidentManager.log(tcpClient.getSocket().getInetAddress().getHostAddress(),
+                            InetAddress.getLocalHost().getHostAddress(),
+                            SMTP_START_INPUT,
+                            SMTP_OK);
+                    tcpClient.writeToClient("Mail successfully sent!\nRevoking authorized privileges, invoke HELO to send another message");
+                } catch (Exception ex) {
+                    logUnknownError(ex);
                 }
             }
         } catch (IOException ex) {
-            try {
-                IncidentManager.log(tcpClient.getSocket().getInetAddress().getHostAddress(),
-                        InetAddress.getLocalHost().getHostAddress(),
-                        "UNKNOWN",
-                        "UNKNOWN");
-            } catch (UnknownHostException e) {
-                System.err.println("Unexpected error occurred. Terminating application");
-                System.exit(1);
-            }
-        } finally {
-            System.out.println("Connection to client: " + tcpClient.getSocket().getInetAddress().getHostAddress() + " has been lost\n" +
-                    "Disconnecting and moving on");
-            tcpClient.closeStreams();
+            logUnknownError(ex);
         }
     }
 
     private void communicateServerReady() {
-        tcpClient.writeToClient(SMTP_SERVER_READY + " (Prompted user input not implemented; Must use protocols to continue)");
+        tcpClient.writeToClient(SMTP_SERVER_READY + "\n(Prompted user input not implemented; Must use protocols manually to continue)");
+    }
+
+    private void greetClient() throws UnknownHostException {
+        tcpClient.writeToClient("250 Hello");
+        IncidentManager.log(tcpClient.getSocket().getInetAddress().getHostAddress(),
+                InetAddress.getLocalHost().getHostAddress(),
+                SMTP_HELO,
+                "250 Hello");
     }
 
     private void communicateOK() {
@@ -140,15 +249,43 @@ public class TcpAgent implements Runnable {
         return emailBody;
     }
 
-    private boolean requestMailFromInSequence(String request) {
-        return request.toUpperCase().startsWith(SMTP_MAIL_FROM);
+    private boolean clientQuit(String request) {
+        return request.equalsIgnoreCase("QUIT");
     }
 
-    private boolean requestMailToInSequence(String request) {
-        return request.toUpperCase().startsWith(SMTP_MAIL_TO);
+    private void bidFarewell() throws UnknownHostException {
+        tcpClient.writeToClient(SMTP_GOODBYE);
+        IncidentManager.log(tcpClient.getSocket().getInetAddress().getHostAddress(),
+                InetAddress.getLocalHost().getHostAddress(),
+                "QUIT",
+                SMTP_GOODBYE);
     }
 
-    private boolean requestDataInSequence(String request) {
+    private void terminateClientConnection() {
+        System.out.println("Client " + tcpClient.getSocket().getInetAddress().getHostAddress() + " has disconnected...");
+        tcpClient.closeStreams();
+    }
+
+    private void terminateIfClientQuit(String request) throws UnknownHostException {
+        if (clientQuit(request)) {
+            bidFarewell();
+            terminateClientConnection();
+        }
+    }
+
+    private boolean clientSocketClosed() {
+        return tcpClient.getSocket().isClosed();
+    }
+
+    private boolean validMailFrom(String request) {
+        return request.toUpperCase().startsWith(SMTP_MAIL_FROM) && request.contains(this.clientEmail);
+    }
+
+    private boolean validMailTo(String request) {
+        return request.toUpperCase().startsWith(SMTP_MAIL_TO) && request.contains(EMAIL_DOMAIN);
+    }
+
+    private boolean validData(String request) {
         return request.equalsIgnoreCase(SMTP_DATA);
     }
 
@@ -158,5 +295,17 @@ public class TcpAgent implements Runnable {
                 || request.toUpperCase().startsWith(SMTP_MAIL_TO)
                 || request.equalsIgnoreCase(SMTP_DATA)
                 || request.endsWith("\n.\n"));
+    }
+
+    private void logUnknownError(Exception ex) {
+        try {
+            IncidentManager.log(tcpClient.getSocket().getInetAddress().getHostAddress(),
+                    InetAddress.getLocalHost().getHostAddress(),
+                    "EXCEPTION OCCURRED",
+                    ex.getMessage());
+        } catch (UnknownHostException e) {
+            System.err.println("Unexpected error occurred. Terminating application");
+            System.exit(1);
+        }
     }
 }

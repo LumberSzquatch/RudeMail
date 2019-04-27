@@ -14,8 +14,10 @@ public class TcpReceiver implements Runnable {
     public void run() {
         try {
             while (multithreadedClient.isConnected()) {
-                System.out.println((String) multithreadedClient.readFromServer());
+                String response = (String) multithreadedClient.readFromServer();
+                System.out.println(response);
             }
+
         } catch (IOException ex) {
             System.out.println("Disconnected from host.");
             System.exit(0);

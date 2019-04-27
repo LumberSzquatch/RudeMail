@@ -21,9 +21,6 @@ public class UdpAgent implements Runnable {
         System.out.println("UDP agent ready to receive");
         while (this.isRunning) {
             try {
-
-                System.out.println("testuser validated as user");
-                String user = "testuser";
                 byte[] inputBuffer = new byte[2048];
                 DatagramPacket clientRequestPacket = inboundPacketFrom(inputBuffer);
                 String requestString = receiveClientRequest(clientRequestPacket);

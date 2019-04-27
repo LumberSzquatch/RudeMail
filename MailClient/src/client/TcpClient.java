@@ -12,6 +12,8 @@ public class TcpClient extends Socket {
     private ObjectOutputStream outputStream;
     private String clientUsername;
 
+    private boolean helo;
+    private boolean auth;
     private boolean setMailFrom;
     private boolean setMailTo;
     private boolean setData;
@@ -62,7 +64,9 @@ public class TcpClient extends Socket {
         }
     }
 
-    private void initializeCommandPrompts() {
+    public void initializeCommandPrompts() {
+        helo = false;
+        auth = false;
         setMailFrom = false;
         setMailTo = false;
         setData = false;
@@ -78,6 +82,14 @@ public class TcpClient extends Socket {
         }
     }
 
+    public boolean saidHelo() {
+        return helo;
+    }
+
+    public boolean isAuthorized() {
+        return auth;
+    }
+
     public boolean isMailFromSet() {
         return setMailFrom;
     }
@@ -88,6 +100,14 @@ public class TcpClient extends Socket {
 
     public boolean isDataSet() {
         return setData;
+    }
+
+    public void setHelo(boolean helo) {
+        this.helo = helo;
+    }
+
+    public void setAuth(boolean auth) {
+        this.auth = auth;
     }
 
     public void setMailFrom(boolean setMailFrom) {
