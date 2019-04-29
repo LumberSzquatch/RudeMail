@@ -40,6 +40,7 @@ public class MailServer {
 
         initializeDBMS();
         initializeSIM();
+        initializeCM();
         spinUpTCPAgent(forTCP);
         spinUpUDPAgent(forUDP);
     }
@@ -88,5 +89,9 @@ public class MailServer {
 
     private static void initializeSIM() {
         IncidentManager.initializeSIM();
+    }
+
+    private static void initializeCM() {
+        CredentialsManager.initializeCM();
     }
 }

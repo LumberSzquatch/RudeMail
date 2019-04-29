@@ -28,6 +28,8 @@ public class TcpAgent implements Runnable {
 
     private boolean isNewUser;
     private String clientEmail;
+    private String encodedEmailString;
+    private String encodedPasswordString;
 
     public TcpAgent(TcpClient tcpClient) {
         this.tcpClient = tcpClient;
@@ -56,6 +58,7 @@ public class TcpAgent implements Runnable {
                         }
                         tcpClient.writeToClient(SMTP_INVALID + "; I won't help you until you say HELO");
                         request = getClientRequest();
+                        System.out.println(request);
                     }
 
                     if (clientSocketClosed()) {
@@ -82,25 +85,24 @@ public class TcpAgent implements Runnable {
                             AUTH,
                             USERNAME_CHALLENGE);
 
-                    request = getClientRequest();
-                    // todo: decode b64 request
+                    request = B64Util.decode(getClientRequest());
                     while (!request.contains(EMAIL_DOMAIN)) {
                         terminateIfClientQuit(request);
                         if (clientSocketClosed()) {
                             break;
                         }
                         tcpClient.writeToClient(INVALID_CREDENTIALS + "; Not a valid email");
-                        request = getClientRequest();
-                        // todo: decode b64 request
+                        request = B64Util.decode(getClientRequest());
                     }
 
-
-                    this.clientEmail = B64Authorizer.decode(request);
-                    // TODO://////////////////////////////////////////////////
-                    // if email not in .user_pass file => isNewUser = true
-                    // start new sequence/while loop of registering new user
-                    // TODO://////////////////////////////////////////////////
-
+                    this.clientEmail = request;
+                    this.encodedEmailString = B64Util.encode(this.clientEmail);
+                    if (!CredentialsManager.isRegisteredUser(encodedEmailString)) {
+                        // TODO://////////////////////////////////////////////////
+                        // if email not in .user_pass file => isNewUser = true
+                        // start new sequence/while loop of registering new user
+                        // TODO://////////////////////////////////////////////////
+                    }
 
                     int loginAttempts = 4;
                     tcpClient.writeToClient(PASSWORD_CHALLENGE);
@@ -108,9 +110,9 @@ public class TcpAgent implements Runnable {
                             InetAddress.getLocalHost().getHostAddress(),
                             AUTH,
                             PASSWORD_CHALLENGE);
-                    request = getClientRequest();
-                    // todo: decode b64 request
-                    while (!B64Authorizer.passwordValid(request)) {
+                    request = B64Util.decode(getClientRequest());
+                    this.encodedPasswordString = B64Util.encode(request);
+                    while (!CredentialsManager.passwordValid(this.encodedPasswordString)) {
                         terminateIfClientQuit(request);
                         loginAttempts--;
                         if (loginAttempts == 0) {
@@ -123,8 +125,8 @@ public class TcpAgent implements Runnable {
                         }
                         tcpClient.writeToClient(INVALID_CREDENTIALS + "; Password does not match what is on file ("
                                 + loginAttempts + " attempts remaining before termination)");
-                        request = getClientRequest();
-                        // todo: decode b64 request
+                        request = B64Util.decode(getClientRequest());
+                        this.encodedPasswordString = B64Util.encode(request);
                     }
 
                     if (clientSocketClosed()) {
@@ -137,9 +139,7 @@ public class TcpAgent implements Runnable {
                             AUTH_SUCCESS);
 
                     request = getClientRequest();
-                    System.out.println(request.toUpperCase().startsWith(SMTP_MAIL_FROM) && request.contains(this.clientEmail));
                     while (!validMailFrom(request)) {
-                        System.out.println(request.toUpperCase().startsWith(SMTP_MAIL_FROM) && request.contains(this.clientEmail));
                         terminateIfClientQuit(request);
                         if (clientSocketClosed()) {
                             break;
@@ -278,6 +278,7 @@ public class TcpAgent implements Runnable {
     }
 
     private boolean validMailFrom(String request) {
+        //todo: check for matching client email really should be done client side
         return request.toUpperCase().startsWith(SMTP_MAIL_FROM) && request.contains(this.clientEmail);
     }
 
@@ -302,7 +303,7 @@ public class TcpAgent implements Runnable {
             IncidentManager.log(tcpClient.getSocket().getInetAddress().getHostAddress(),
                     InetAddress.getLocalHost().getHostAddress(),
                     "EXCEPTION OCCURRED",
-                    ex.getMessage());
+                    ex.getMessage() + "\n" + ex.getLocalizedMessage() + "\n" + ex.toString());
         } catch (UnknownHostException e) {
             System.err.println("Unexpected error occurred. Terminating application");
             System.exit(1);

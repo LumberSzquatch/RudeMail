@@ -8,6 +8,7 @@ public class TcpAgent implements Runnable {
     private final static String GREET_SERVER = "HELO";
     private final static String SMTP_MAIL_FROM = "MAIL FROM: ";
     private final static String SMTP_MAIL_TO = "RCPT TO: ";
+    private final static String AUTH_REQUEST = "AUTH";
 
     private String serverHostname;
     private int serverPort;
@@ -26,7 +27,19 @@ public class TcpAgent implements Runnable {
             new Thread(new TcpReceiver(multithreadedClient)).start();
             Scanner scanner = new Scanner(System.in);
             while (hasServerConnection) {
-                multithreadedClient.sendToServer(scanner.nextLine());
+                String request = scanner.nextLine();
+                if (request.equalsIgnoreCase(GREET_SERVER)) {
+                    multithreadedClient.setHelo(true);
+                }
+                if (multithreadedClient.shouldDataBeEncoded()) {
+                    multithreadedClient.sendToServer(B64Util.encode(request));
+                } else {
+                    multithreadedClient.sendToServer(request);
+                    if (request.equalsIgnoreCase(AUTH_REQUEST) && multithreadedClient.saidHelo()) {
+                        multithreadedClient.setEncodeData(true);
+                        multithreadedClient.setHelo(false);
+                    }
+                }
             }
 
         } catch (IOException ex) {

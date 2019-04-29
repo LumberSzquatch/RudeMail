@@ -17,11 +17,13 @@ public class TcpClient extends Socket {
     private boolean setMailFrom;
     private boolean setMailTo;
     private boolean setData;
+    private boolean encodeData;
 
     public TcpClient() {
         super();
         hostName = "";
         clientUsername = "";
+        encodeData = false;
     }
 
     public TcpClient(String host, int port) throws IOException {
@@ -90,6 +92,10 @@ public class TcpClient extends Socket {
         return auth;
     }
 
+    public boolean shouldDataBeEncoded() {
+        return encodeData;
+    }
+
     public boolean isMailFromSet() {
         return setMailFrom;
     }
@@ -108,6 +114,10 @@ public class TcpClient extends Socket {
 
     public void setAuth(boolean auth) {
         this.auth = auth;
+    }
+
+    public void setEncodeData(boolean encodeData) {
+        this.encodeData = encodeData;
     }
 
     public void setMailFrom(boolean setMailFrom) {

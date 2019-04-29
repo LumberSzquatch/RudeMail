@@ -15,6 +15,9 @@ public class TcpReceiver implements Runnable {
         try {
             while (multithreadedClient.isConnected()) {
                 String response = (String) multithreadedClient.readFromServer();
+                if (response.startsWith("235")) {
+                    multithreadedClient.setEncodeData(false);
+                }
                 System.out.println(response);
             }
 

@@ -83,8 +83,8 @@ public class TcpClient {
             inputStream.close();
             outputStream.close();
         } catch (IOException ex) {
-            ex.printStackTrace();
             System.err.println("Failed to close streams.");
+            ex.printStackTrace();
         }
     }
 
