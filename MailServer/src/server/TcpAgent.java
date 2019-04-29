@@ -24,12 +24,15 @@ public class TcpAgent implements Runnable {
     private final static String USERNAME_CHALLENGE = "334 dXNlcm5hbWU6";
     private final static String PASSWORD_CHALLENGE = "334 cGFzc3dvcmQ6";
     private final static String AUTH_SUCCESS = "235 AUTH Success";
+    private final static String AUTH_REGISTER = "330 Must Register\nTemporary Password: ";
     private final static String EMAIL_DOMAIN = "@cs447.edu";
 
     private boolean isNewUser;
+    private boolean clientHasConnection;
     private String clientEmail;
     private String encodedEmailString;
     private String encodedPasswordString;
+    private String temporaryPassword;
 
     public TcpAgent(TcpClient tcpClient) {
         this.tcpClient = tcpClient;
@@ -48,8 +51,9 @@ public class TcpAgent implements Runnable {
             Email email = new Email();
             String request;
             while (tcpClient.getSocket().isConnected()) {
-
+                this.clientHasConnection = true;
                 try {
+                    // HELO Sequence - Keep Client locked in until HELO or QUIT is requested
                     request = getClientRequest();
                     while (!request.equalsIgnoreCase(SMTP_HELO)) {
                         terminateIfClientQuit(request);
@@ -66,6 +70,7 @@ public class TcpAgent implements Runnable {
                     }
                     greetClient();
 
+                    // AUTH Sequence - Keep client locked in until AUTH or QUIT is requested
                     request = getClientRequest();
                     while (!request.equalsIgnoreCase(AUTH)) {
                         terminateIfClientQuit(request);
@@ -79,6 +84,8 @@ public class TcpAgent implements Runnable {
                     if (clientSocketClosed()) {
                         break;
                     }
+
+                    // AUTH USER Challenge - Lock client in until valid email/username is given or requested QUIT
                     tcpClient.writeToClient(USERNAME_CHALLENGE);
                     IncidentManager.log(tcpClient.getSocket().getInetAddress().getHostAddress(),
                             InetAddress.getLocalHost().getHostAddress(),
@@ -95,15 +102,28 @@ public class TcpAgent implements Runnable {
                         request = B64Util.decode(getClientRequest());
                     }
 
+                    if (clientSocketClosed()) {
+                        break;
+                    }
                     this.clientEmail = request;
                     this.encodedEmailString = B64Util.encode(this.clientEmail);
+
+                    // Start registration process if user is not already registered in .user_pass
                     if (!CredentialsManager.isRegisteredUser(encodedEmailString)) {
+                        this.isNewUser = true; // this might end up being irrelevant
+                        this.temporaryPassword = CredentialsManager.generateTemporaryPassword();
                         // TODO://////////////////////////////////////////////////
                         // if email not in .user_pass file => isNewUser = true
                         // start new sequence/while loop of registering new user
                         // TODO://////////////////////////////////////////////////
+
                     }
 
+                    if (clientSocketClosed()) {
+                        break;
+                    }
+
+                    // AUTH PASSWORD Challenge - Lock client in until valid password is given or requested QUIT
                     int loginAttempts = 4;
                     tcpClient.writeToClient(PASSWORD_CHALLENGE);
                     IncidentManager.log(tcpClient.getSocket().getInetAddress().getHostAddress(),
@@ -112,10 +132,12 @@ public class TcpAgent implements Runnable {
                             PASSWORD_CHALLENGE);
                     request = B64Util.decode(getClientRequest());
                     this.encodedPasswordString = B64Util.encode(request);
-                    while (!CredentialsManager.passwordValid(this.encodedPasswordString)) {
+
+                    while (!CredentialsManager.passwordValid(this.encodedEmailString, this.encodedPasswordString)) {
                         terminateIfClientQuit(request);
                         loginAttempts--;
-                        if (loginAttempts == 0) {
+                        // User will be forcibly disconnected after a total of 4 failed login attempts
+                        if (loginAttempts == 0 && !clientSocketClosed()) {
                             tcpClient.writeToClient(INVALID_CREDENTIALS + "; Maximum login attempts exceeded, connection terminating...");
                             bidFarewell();
                             terminateClientConnection();
@@ -132,12 +154,14 @@ public class TcpAgent implements Runnable {
                     if (clientSocketClosed()) {
                         break;
                     }
+
                     tcpClient.writeToClient(AUTH_SUCCESS + "; You may now continue with mail commands");
                     IncidentManager.log(tcpClient.getSocket().getInetAddress().getHostAddress(),
                             InetAddress.getLocalHost().getHostAddress(),
                             AUTH,
                             AUTH_SUCCESS);
 
+                    // MAIL FROM - Keep client locked in until they either request proper MAIL FROM or QUIT
                     request = getClientRequest();
                     while (!validMailFrom(request)) {
                         terminateIfClientQuit(request);
@@ -151,6 +175,7 @@ public class TcpAgent implements Runnable {
                     if (clientSocketClosed()) {
                         break;
                     }
+
                     email.setFromField(parseAddressFromRequest(request));
                     communicateOK();
                     IncidentManager.log(tcpClient.getSocket().getInetAddress().getHostAddress(),
@@ -158,6 +183,7 @@ public class TcpAgent implements Runnable {
                             SMTP_MAIL_FROM,
                             SMTP_OK);
 
+                    // RCPT TO - Keep client locked in until they either request proper RCPT TO or QUIT
                     request = getClientRequest();
                     while (!validMailTo(request)) {
                         terminateIfClientQuit(request);
@@ -171,6 +197,7 @@ public class TcpAgent implements Runnable {
                     if (clientSocketClosed()) {
                         break;
                     }
+
                     email.setRecipientField(parseRecipientFromRequest(request));
                     communicateOK();
                     IncidentManager.log(tcpClient.getSocket().getInetAddress().getHostAddress(),
@@ -178,6 +205,7 @@ public class TcpAgent implements Runnable {
                             SMTP_MAIL_TO,
                             SMTP_OK);
 
+                    // DATA- Keep client locked in until they either request proper DATA or QUIT
                     request = getClientRequest();
                     while (!validData(request)) {
                         terminateIfClientQuit(request);
@@ -191,6 +219,7 @@ public class TcpAgent implements Runnable {
                     if (clientSocketClosed()) {
                         break;
                     }
+
                     tcpClient.writeToClient(SMTP_START_INPUT);
                     request = parseDataFromRequest();
                     email.setEmailData(
@@ -264,6 +293,7 @@ public class TcpAgent implements Runnable {
     private void terminateClientConnection() {
         System.out.println("Client " + tcpClient.getSocket().getInetAddress().getHostAddress() + " has disconnected...");
         tcpClient.closeStreams();
+        this.clientHasConnection = false;
     }
 
     private void terminateIfClientQuit(String request) throws UnknownHostException {

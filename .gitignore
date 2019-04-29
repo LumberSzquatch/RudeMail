@@ -1,12 +1,15 @@
 # Build and Project Files
 *.class
 *.iml
-*.log
+*.server_log
+*.email
+*.user_pass
 *.MF
 .idea
 out
 META-INF
 db
+log
 
 # Package Files #
 *.jar
