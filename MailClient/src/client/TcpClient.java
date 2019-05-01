@@ -12,14 +12,18 @@ public class TcpClient extends Socket {
     private ObjectOutputStream outputStream;
     private String clientUsername;
 
+    private boolean helo;
+    private boolean auth;
     private boolean setMailFrom;
     private boolean setMailTo;
     private boolean setData;
+    private boolean encodeData;
 
     public TcpClient() {
         super();
         hostName = "";
         clientUsername = "";
+        encodeData = false;
     }
 
     public TcpClient(String host, int port) throws IOException {
@@ -62,13 +66,15 @@ public class TcpClient extends Socket {
         }
     }
 
-    private void initializeCommandPrompts() {
+    public void initializeCommandPrompts() {
+        helo = false;
+        auth = false;
         setMailFrom = false;
         setMailTo = false;
         setData = false;
     }
 
-    private void initializeIOStreams() {
+    public void initializeIOStreams() {
         try {
             outputStream = new ObjectOutputStream(this.getOutputStream());
             inputStream = new ObjectInputStream(this.getInputStream());
@@ -76,6 +82,18 @@ public class TcpClient extends Socket {
             ex.printStackTrace();
             System.err.println("Failed to setup streams.");
         }
+    }
+
+    public boolean saidHelo() {
+        return helo;
+    }
+
+    public boolean isAuthorized() {
+        return auth;
+    }
+
+    public boolean shouldDataBeEncoded() {
+        return encodeData;
     }
 
     public boolean isMailFromSet() {
@@ -88,6 +106,18 @@ public class TcpClient extends Socket {
 
     public boolean isDataSet() {
         return setData;
+    }
+
+    public void setHelo(boolean helo) {
+        this.helo = helo;
+    }
+
+    public void setAuth(boolean auth) {
+        this.auth = auth;
+    }
+
+    public void setEncodeData(boolean encodeData) {
+        this.encodeData = encodeData;
     }
 
     public void setMailFrom(boolean setMailFrom) {
