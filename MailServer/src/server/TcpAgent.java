@@ -2,12 +2,14 @@ package server;
 
 import java.io.IOException;
 import java.net.InetAddress;
+import java.net.SocketException;
 import java.net.UnknownHostException;
 import java.util.Date;
 
 public class TcpAgent implements Runnable {
 
     private final TcpClient tcpClient;
+    private Thread clientThread;
 
     private final static String SMTP_HELO = "HELO";
     private final static String SMTP_MAIL_FROM = "MAIL FROM:";
@@ -28,20 +30,29 @@ public class TcpAgent implements Runnable {
     private final static String EMAIL_DOMAIN = "@cs447.edu";
 
     private boolean isNewUser;
-    private boolean clientHasConnection;
+    private boolean onRegistrationIdle;
     private String clientEmail;
     private String encodedEmailString;
     private String encodedPasswordString;
     private String temporaryPassword;
 
+    private String clientIP;
+
     public TcpAgent(TcpClient tcpClient) {
         this.tcpClient = tcpClient;
+        this.clientIP = tcpClient.getCustomName();
         this.isNewUser = false;
+        this.onRegistrationIdle = false;
+        this.clientThread = null;
+    }
+
+    public void setClientThread(Thread thread) {
+        this.clientThread = thread;
     }
 
     @Override
     public void run() {
-        System.out.println("Client " + tcpClient.getSocket().getInetAddress().getHostAddress() + " has established connection");
+        System.out.println("Client " + tcpClient.getCustomName() + " has established connection");
         try {
             IncidentManager.log(tcpClient.getSocket().getInetAddress().getHostAddress(),
                     InetAddress.getLocalHost().getHostAddress(),
@@ -51,7 +62,7 @@ public class TcpAgent implements Runnable {
             Email email = new Email();
             String request;
             while (tcpClient.getSocket().isConnected()) {
-                this.clientHasConnection = true;
+
                 try {
                     // HELO Sequence - Keep Client locked in until HELO or QUIT is requested
                     request = getClientRequest();
@@ -110,13 +121,13 @@ public class TcpAgent implements Runnable {
 
                     // Start registration process if user is not already registered in .user_pass
                     if (!CredentialsManager.isRegisteredUser(encodedEmailString)) {
+                        System.out.println("Waiting for connection refresh from client" + tcpClient.getCustomName() + " ...");
                         this.isNewUser = true; // this might end up being irrelevant
+                        this.onRegistrationIdle = true;
                         this.temporaryPassword = CredentialsManager.generateTemporaryPassword();
-                        // TODO://////////////////////////////////////////////////
-                        // if email not in .user_pass file => isNewUser = true
-                        // start new sequence/while loop of registering new user
-                        // TODO://////////////////////////////////////////////////
-
+                        CredentialsManager.writeUserToMasterFile(this.encodedEmailString, temporaryPassword);
+                        tcpClient.writeToClient(AUTH_REGISTER + temporaryPassword);
+                        System.out.println("Connection refreshed for client " + tcpClient.getCustomName());
                     }
 
                     if (clientSocketClosed()) {
@@ -131,6 +142,10 @@ public class TcpAgent implements Runnable {
                             AUTH,
                             PASSWORD_CHALLENGE);
                     request = B64Util.decode(getClientRequest());
+                    if (isNewUser) {
+                        request = CredentialsManager.modifyGeneratedNumber(request);
+                        isNewUser = false;
+                    }
                     this.encodedPasswordString = B64Util.encode(request);
 
                     while (!CredentialsManager.passwordValid(this.encodedEmailString, this.encodedPasswordString)) {
@@ -234,6 +249,13 @@ public class TcpAgent implements Runnable {
                             SMTP_OK);
                     tcpClient.writeToClient("Mail successfully sent!\nRevoking authorized privileges, invoke HELO to send another message");
                 } catch (Exception ex) {
+                    if (ex instanceof IOException) {
+                        // todo: watch out, this maybe might happen if we sleep the thread (maybe, idk? just a gut feeling)
+                        System.out.println("Client " + clientIP + " connection was not able to be maintained\n" +
+                                "Closing socket connection and terminating thread for client...");
+                        terminateClientConnection();
+                        return;
+                    }
                     logUnknownError(ex);
                 }
             }
@@ -290,17 +312,16 @@ public class TcpAgent implements Runnable {
                 SMTP_GOODBYE);
     }
 
-    private void terminateClientConnection() {
-        System.out.println("Client " + tcpClient.getSocket().getInetAddress().getHostAddress() + " has disconnected...");
-        tcpClient.closeStreams();
-        this.clientHasConnection = false;
-    }
-
     private void terminateIfClientQuit(String request) throws UnknownHostException {
         if (clientQuit(request)) {
             bidFarewell();
             terminateClientConnection();
         }
+    }
+
+    private void terminateClientConnection() {
+        System.out.println("Client " + tcpClient.getSocket().getInetAddress().getHostAddress() + " has disconnected...");
+        tcpClient.closeStreams();
     }
 
     private boolean clientSocketClosed() {
@@ -333,7 +354,7 @@ public class TcpAgent implements Runnable {
             IncidentManager.log(tcpClient.getSocket().getInetAddress().getHostAddress(),
                     InetAddress.getLocalHost().getHostAddress(),
                     "EXCEPTION OCCURRED",
-                    ex.getMessage() + "\n" + ex.getLocalizedMessage() + "\n" + ex.toString());
+                    ex.toString());
         } catch (UnknownHostException e) {
             System.err.println("Unexpected error occurred. Terminating application");
             System.exit(1);

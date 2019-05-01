@@ -1,9 +1,6 @@
 package server;
 
-import java.io.BufferedReader;
-import java.io.File;
-import java.io.FileReader;
-import java.io.IOException;
+import java.io.*;
 import java.util.Random;
 
 public class CredentialsManager {
@@ -14,6 +11,8 @@ public class CredentialsManager {
 
     private static final int EXTRA_STEP_NUMBER = 447;
 
+    private static File masterFile;
+
     public CredentialsManager() {
         File directory = new File(ROOT_DIRECTORY);
         if (!directory.exists()) {
@@ -21,6 +20,7 @@ public class CredentialsManager {
         }
 
         File credentials = new File(ROOT_DIRECTORY + VAULT);
+        CredentialsManager.masterFile = credentials;
         if (!credentials.exists()) {
             try {
                 credentials.createNewFile();
@@ -50,6 +50,9 @@ public class CredentialsManager {
 
             while (currentCredentials != null) {
                 currentCredentials = reader.readLine();
+                if (currentCredentials == null) {
+                    return false;
+                }
                 if (currentCredentials.contains(encodedEmail)) {
                     return true;
                 }
@@ -91,12 +94,26 @@ public class CredentialsManager {
         return false;
     }
 
+    public static void writeUserToMasterFile(String b64EncodedEmail, String unmodifiedPassword) throws IOException {
+
+        String userCredentials = b64EncodedEmail + CREDS_DELIMITER + B64Util.encode(modifyGeneratedNumber(unmodifiedPassword));
+
+        try (FileWriter fw = new FileWriter(masterFile, true);
+             BufferedWriter bw = new BufferedWriter(fw);
+             PrintWriter printWriter = new PrintWriter(bw))
+        {
+            printWriter.println(userCredentials);
+        } catch (IOException e) {
+            System.err.println("Failed to write to log file");
+        }
+    }
+
     public static String generateTemporaryPassword() {
         char[] password = new char[5];
         for (int i = 0; i < password.length; i++) {
             password[i] = getRandomSingleDigit();
         }
-        return modifyGeneratedNumber(new String(password));
+        return new String(password);
     }
 
     private static char getRandomSingleDigit() {
@@ -106,7 +123,7 @@ public class CredentialsManager {
                 .charAt(0);
     }
 
-    private static String modifyGeneratedNumber(String fiveDigitInteger) {
+    public static String modifyGeneratedNumber(String fiveDigitInteger) {
         // Adding 447 to generated value for extra layer of security (or something; sounds like extra steps)
         int modifiedDigits = Integer.parseInt(fiveDigitInteger) + EXTRA_STEP_NUMBER;
         return Integer.toString(modifiedDigits);

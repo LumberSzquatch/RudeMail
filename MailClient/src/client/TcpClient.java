@@ -74,7 +74,7 @@ public class TcpClient extends Socket {
         setData = false;
     }
 
-    private void initializeIOStreams() {
+    public void initializeIOStreams() {
         try {
             outputStream = new ObjectOutputStream(this.getOutputStream());
             inputStream = new ObjectInputStream(this.getInputStream());

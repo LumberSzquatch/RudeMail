@@ -82,6 +82,7 @@ public class TcpClient {
         try {
             inputStream.close();
             outputStream.close();
+            this.getSocket().close();
         } catch (IOException ex) {
             System.err.println("Failed to close streams.");
             ex.printStackTrace();

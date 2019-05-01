@@ -24,7 +24,7 @@ public class TcpAgent implements Runnable {
         try {
             TcpClient multithreadedClient = new TcpClient(serverHostname, serverPort);
             // New incoming clients will run on their own thread
-            new Thread(new TcpReceiver(multithreadedClient)).start();
+            new Thread(new TcpReceiver(multithreadedClient, serverHostname, serverPort)).start();
             Scanner scanner = new Scanner(System.in);
             while (hasServerConnection) {
                 String request = scanner.nextLine();
