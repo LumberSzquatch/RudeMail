@@ -51,6 +51,7 @@ public class TcpAgent implements Runnable {
                 Scanner scanner = new Scanner(System.in);
 
                 while (hasServerConnection) {
+                    secureSocket.startHandshake();
                     String request = scanner.nextLine();
                     if (request.equalsIgnoreCase(GREET_SERVER)) {
                         TcpAgent.saidHelo = true;

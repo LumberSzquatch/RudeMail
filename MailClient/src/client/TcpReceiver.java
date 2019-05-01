@@ -31,6 +31,9 @@ public class TcpReceiver implements Runnable {
         try {
             if (this.securedSocket != null) {
                 while (securedSocket.isConnected()) {
+                    if (securedSocket instanceof SSLSocket) {
+                        ((SSLSocket) securedSocket).startHandshake();
+                    }
                     String response =  secureReadFromServer();
                     System.out.println(response);
                     if (response.startsWith("235")) {
