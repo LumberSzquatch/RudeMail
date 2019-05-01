@@ -2,7 +2,6 @@ package server;
 
 import java.io.IOException;
 import java.net.InetAddress;
-import java.net.SocketException;
 import java.net.UnknownHostException;
 import java.util.Date;
 
@@ -29,8 +28,8 @@ public class TcpAgent implements Runnable {
     private final static String AUTH_REGISTER = "330 Must Register\nTemporary Password: ";
     private final static String EMAIL_DOMAIN = "@cs447.edu";
 
+    private boolean usesSecureChannel;
     private boolean isNewUser;
-    private boolean onRegistrationIdle;
     private String clientEmail;
     private String encodedEmailString;
     private String encodedPasswordString;
@@ -38,11 +37,11 @@ public class TcpAgent implements Runnable {
 
     private String clientIP;
 
-    public TcpAgent(TcpClient tcpClient) {
+    public TcpAgent(TcpClient tcpClient, boolean usesSecureChannel) {
         this.tcpClient = tcpClient;
+        this.usesSecureChannel = usesSecureChannel;
         this.clientIP = tcpClient.getCustomName();
         this.isNewUser = false;
-        this.onRegistrationIdle = false;
         this.clientThread = null;
     }
 
@@ -123,7 +122,6 @@ public class TcpAgent implements Runnable {
                     if (!CredentialsManager.isRegisteredUser(encodedEmailString)) {
                         System.out.println("Waiting for connection refresh from client" + tcpClient.getCustomName() + " ...");
                         this.isNewUser = true; // this might end up being irrelevant
-                        this.onRegistrationIdle = true;
                         this.temporaryPassword = CredentialsManager.generateTemporaryPassword();
                         CredentialsManager.writeUserToMasterFile(this.encodedEmailString, temporaryPassword);
                         tcpClient.writeToClient(AUTH_REGISTER + temporaryPassword);

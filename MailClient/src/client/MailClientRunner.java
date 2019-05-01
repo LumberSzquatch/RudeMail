@@ -10,13 +10,18 @@ public class MailClientRunner {
     // Allowable Port ranges; the range [1, 1023] is not guaranteed
     private static final int MIN_PORT = 1;
     private static final int  MAX_PORT = 65535;
+    private static final String SECURED_FLAG = "S";
     private static final String QUIT = "QUIT";
 
     public static void main(String[] args) {
-        if (args.length != 2) {
-            System.out.println("Invalid argument length; Expected 2 but was given " + args.length + "; see below for valid arguments\n" +
-                    "Expected input: \"java -jar MailClientRunner.jar <server-hostname> <server-port>\"\n" +
-                    "Where server-hostname is a valid hostname of a server, and server-port is an integer within the range [1, 65535]");
+        if (args.length != 3) {
+            System.err.println("Invalid argument length; Expected 3 but was given " + args.length + "; see below for valid arguments\n" +
+                    "Expected input: \"java -jar MailClientRunner.jar <server-hostname> <server-port> <ssl-tls-flag>\"\n" +
+                    "\t<server-hostname>: a valid hostname of a server\n" +
+                    "\t<server-port>: an integer within the range [1, 65535]\n" +
+                    "\t<ssl-tls-flag>: a single character; either 'S' for secure client channel or 'u' for an unsecured client channel\n" +
+                    "\t\t-- If answer cannot be understood channel will opt for secure channel by default"
+            );
             System.exit(1);
         }
 
@@ -28,6 +33,9 @@ public class MailClientRunner {
             System.exit(1);
         }
 
+        String secureChannelFlag = args[2];
+        boolean isChannelSecure = SECURED_FLAG.equalsIgnoreCase(secureChannelFlag);
+
         System.out.println("Application running (enter 'QUIT' at any time to exit)...");
 
         Scanner scanner = new Scanner(System.in);
@@ -35,7 +43,7 @@ public class MailClientRunner {
             System.out.print("Will you be sending or receiving today? ('s' / 'r'): ");
             String response = scanner.next();
             if (responseIsSend(response)) {
-                startTCPSenderAgent(serverHostname, serverPort);
+                startTCPSenderAgent(serverHostname, serverPort, isChannelSecure);
                 System.exit(0);
             }
 
@@ -62,8 +70,8 @@ public class MailClientRunner {
         }
     }
 
-    private static void startTCPSenderAgent(String host, int port) {
-        TcpAgent tcpAgent = new TcpAgent(host, port);
+    private static void startTCPSenderAgent(String host, int port, boolean usesSecureChannel) {
+        TcpAgent tcpAgent = new TcpAgent(host, port, usesSecureChannel);
         tcpAgent.run();
     }
 

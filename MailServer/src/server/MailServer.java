@@ -14,14 +14,18 @@ public class MailServer {
 
     // Allowable Port ranges; the range [1, 1023] is not guaranteed
     private static final int MIN_PORT = 1;
-    private static final int  MAX_PORT = 65535;
+    private static final int MAX_PORT = 65535;
+    private static final String SECURED_FLAG = "S";
+
     public static void main(String[] args) throws SocketException {
 
-        if (args.length < 2) {
-            System.out.println("Invalid argument length; Expected 2 but was given " + args.length + "; see below for valid arguments\n" +
-                    "Expected input: \"java -jar MailServer.jar <tcp-listen-port> (<udp-listen-port>)\"\n" +
-                    "Where tcp-listen-port is a valid port number for clients sending mail and " +
-                    "udp-listen-port is a valid port number for a client receiving mail\n" +
+        if (args.length < 3) {
+            System.err.println("Invalid argument length; Expected 3 but was given " + args.length + "; see below for valid arguments\n" +
+                    "Expected input: \"java -jar MailServer.jar <tcp-listen-port> <udp-listen-port> <ssl-tls-flag>\"\n" +
+                    "\ttcp-listen-port: a valid port number for clients sending mail\n" +
+                    "\tudp-listen-port: a valid port number for a client receiving mail\n" +
+                    "\t<ssl-tls-flag>: a single character; either 'S' for secure channeled server or 'u' for an unsecured server" +
+                    "\t\t-- If answer cannot be understood channel will opt for secure channel by default" +
                     "TCP and UDP listen ports must be an integer within the range [1, 65535] and cannot equal each other");
             System.exit(1);
         }
@@ -32,16 +36,19 @@ public class MailServer {
             forTCP = Integer.parseInt(args[0]);
             forUDP = Integer.parseInt(args[1]);
         } catch (NumberFormatException nfe) {
-            System.out.println("TCP and UDP listen ports must be an integer within the range [1, 65535] and cannot equal each other\n" +
+            System.err.println("TCP and UDP listen ports must be an integer within the range [1, 65535] and cannot equal each other\n" +
                     "Please provide valid port numbers to run the application...");
             System.exit(1);
         }
         checkPortValidity(forTCP, forUDP);
 
+        String secureChannelFlag = args[2];
+        boolean isChannelSecure = SECURED_FLAG.equalsIgnoreCase(secureChannelFlag);
+
         initializeDBMS();
         initializeSIM();
         initializeCM();
-        spinUpTCPAgent(forTCP);
+        spinUpTCPAgent(forTCP, isChannelSecure);
         spinUpUDPAgent(forUDP);
     }
 
@@ -75,8 +82,8 @@ public class MailServer {
         return port == portToCompare;
     }
 
-    private static void spinUpTCPAgent(int port) {
-        new Thread(new TcpClientManager(port)).start();
+    private static void spinUpTCPAgent(int port, boolean isChannelSecure) {
+        new Thread(new TcpClientManager(port, isChannelSecure)).start();
     }
 
     private static void spinUpUDPAgent(int port) throws SocketException {

@@ -1,6 +1,11 @@
 package client;
 
+import javax.net.ssl.SSLSocket;
+import javax.net.ssl.SSLSocketFactory;
 import java.io.IOException;
+import java.io.ObjectOutputStream;
+import java.io.OutputStream;
+import java.net.Socket;
 import java.util.Scanner;
 
 public class TcpAgent implements Runnable {
@@ -12,40 +17,83 @@ public class TcpAgent implements Runnable {
 
     private String serverHostname;
     private int serverPort;
+    private boolean usesSecureChannel;
 
-    public TcpAgent(String serverHostname, int serverPort) {
+    public static boolean saidHelo = false;
+    public static boolean shouldEncodeData = false;
+
+    public TcpAgent(String serverHostname, int serverPort, boolean usesSecureChannel) {
         this.serverHostname = serverHostname;
         this.serverPort = serverPort;
+        this.usesSecureChannel = usesSecureChannel;
     }
 
     @Override
     public void run() {
         boolean hasServerConnection = true;
         try {
-            TcpClient multithreadedClient = new TcpClient(serverHostname, serverPort);
-            // New incoming clients will run on their own thread
-            new Thread(new TcpReceiver(multithreadedClient, serverHostname, serverPort)).start();
-            Scanner scanner = new Scanner(System.in);
-            while (hasServerConnection) {
-                String request = scanner.nextLine();
-                if (request.equalsIgnoreCase(GREET_SERVER)) {
-                    multithreadedClient.setHelo(true);
+            TcpClient multithreadedClient;
+            SSLSocket secureSocket = null;
+            if (usesSecureChannel) {
+                // Set up new SSLSocketFactory and get a secured Socket
+                //     use the secured socket instead of TcpClient
+                SSLSocketFactory secureChannelFactory = (SSLSocketFactory) SSLSocketFactory.getDefault();
+                secureSocket = (SSLSocket) secureChannelFactory.createSocket(serverHostname, serverPort);
+                secureSocket.startHandshake();
+                new Thread(new TcpReceiver(secureSocket)).start();
+                Scanner scanner = new Scanner(System.in);
+
+                while (hasServerConnection) {
+                    String request = scanner.nextLine();
+                    if (request.equalsIgnoreCase(GREET_SERVER)) {
+                        TcpAgent.saidHelo = true;
+                    }
+                    if (TcpAgent.shouldEncodeData) {
+//                        secureSendToServer(streamToServer, B64Util.encode(request));
+                    } else {
+//                        secureSendToServer(streamToServer, request);
+                        if (request.equalsIgnoreCase(AUTH_REQUEST) && TcpAgent.saidHelo) {
+                            TcpAgent.shouldEncodeData = true;
+                            TcpAgent.saidHelo = false;
+                        }
+                    }
                 }
-                if (multithreadedClient.shouldDataBeEncoded()) {
-                    multithreadedClient.sendToServer(B64Util.encode(request));
-                } else {
-                    multithreadedClient.sendToServer(request);
-                    if (request.equalsIgnoreCase(AUTH_REQUEST) && multithreadedClient.saidHelo()) {
-                        multithreadedClient.setEncodeData(true);
-                        multithreadedClient.setHelo(false);
+            } else {
+                multithreadedClient = new TcpClient(serverHostname, serverPort);
+                // New incoming clients will run on their own thread
+                new Thread(new TcpReceiver(multithreadedClient, serverHostname, serverPort)).start();
+                Scanner scanner = new Scanner(System.in);
+                while (hasServerConnection) {
+                    String request = scanner.nextLine();
+                    if (request.equalsIgnoreCase(GREET_SERVER)) {
+                        multithreadedClient.setHelo(true);
+                    }
+                    if (multithreadedClient.shouldDataBeEncoded()) {
+                        multithreadedClient.sendToServer(B64Util.encode(request));
+                    } else {
+                        multithreadedClient.sendToServer(request);
+                        if (request.equalsIgnoreCase(AUTH_REQUEST) && multithreadedClient.saidHelo()) {
+                            multithreadedClient.setEncodeData(true);
+                            multithreadedClient.setHelo(false);
+                        }
                     }
                 }
             }
 
         } catch (IOException ex) {
             System.err.println("Failed to establish connection with server");
+            ex.printStackTrace();
             System.exit(1);
         }
+    }
+
+    public void secureSendToServer(ObjectOutputStream secureStream, String request) {
+//        try {
+//            secureStream.writeObject(request);
+//        } catch (IOException ex) {
+//            System.err.println(
+//                    "Failed to write data to output stream");
+//        }
     }
 
     public void mailPrompts(TcpClient multithreadedClient, Scanner scanner) {
