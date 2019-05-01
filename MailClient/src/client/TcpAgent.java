@@ -39,6 +39,10 @@ public class TcpAgent implements Runnable {
                 //     use the secured socket instead of TcpClient
                 SSLSocketFactory secureChannelFactory = (SSLSocketFactory) SSLSocketFactory.getDefault();
                 secureSocket = (SSLSocket) secureChannelFactory.createSocket(serverHostname, serverPort);
+                String enabledSuites[] = { "TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA256" };
+                String protocols[] = {"TLSv1.2"};
+                secureSocket.setEnabledCipherSuites(enabledSuites);
+                secureSocket.setEnabledProtocols(protocols);
                 secureSocket.startHandshake();
                 new Thread(new TcpReceiver(secureSocket)).start();
                 Scanner scanner = new Scanner(System.in);

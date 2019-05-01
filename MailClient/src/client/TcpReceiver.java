@@ -1,5 +1,7 @@
 package client;
 
+import javax.net.ssl.SSLSocket;
+import java.io.BufferedInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.ObjectInputStream;
@@ -9,13 +11,13 @@ public class TcpReceiver implements Runnable {
 
     private TcpClient multithreadedClient;
     private Socket securedSocket;
-    private InputStream inputStream;
+    private BufferedInputStream inputStream;
     private String serverHostname;
     private int serverPort;
 
     public TcpReceiver(Socket securedSocket) throws IOException {
         this.securedSocket = securedSocket;
-        this.inputStream = securedSocket.getInputStream();
+        this.inputStream = new BufferedInputStream(securedSocket.getInputStream());
     }
 
     public TcpReceiver(TcpClient multithreadedClient, String serverHostname, int serverPort) {
@@ -29,7 +31,7 @@ public class TcpReceiver implements Runnable {
         try {
             if (this.securedSocket != null) {
                 while (securedSocket.isConnected()) {
-                    String response =  Integer.toString(secureReadFromServer());
+                    String response =  secureReadFromServer();
                     System.out.println(response);
                     if (response.startsWith("235")) {
                         TcpAgent.shouldEncodeData = false;
@@ -70,8 +72,16 @@ public class TcpReceiver implements Runnable {
         }
     }
 
-    private int secureReadFromServer() throws IOException {
-        return 0;//inputStream.read();
+    private String secureReadFromServer() throws IOException {
+        try {
+            byte[] data = new byte[2048];
+            int len = inputStream.read(data);
+            return new String(data, 0, len);
+        } catch (Exception ex) {
+            System.err.println(
+                    "Failed to retrieve data from input stream");
+        }
+        return "";
     }
 
     private void waitToRefreshConnection() throws InterruptedException {

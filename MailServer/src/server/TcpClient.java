@@ -1,31 +1,28 @@
 package server;
 
-import java.io.IOException;
-import java.io.InputStream;
-import java.io.ObjectInputStream;
-import java.io.ObjectOutputStream;
+import java.io.*;
 import java.net.Socket;
 
 public class TcpClient {
 
     private Socket socket;
+    private boolean usesSecureChannel;
 
     private String customName;
     private ObjectInputStream inputStream;
     private ObjectOutputStream outputStream;
 
+    private BufferedInputStream securedInputStream;
+    private BufferedOutputStream securedOutputStream;
+
     public TcpClient() {
     }
 
-    public TcpClient(Socket socket) throws IOException {
+    public TcpClient(Socket socket, boolean usesSecureChannel) throws IOException {
         this.socket = socket;
+        this.usesSecureChannel = usesSecureChannel;
         setupStreams();
         customName = socket.getInetAddress().getHostAddress();
-    }
-
-    public TcpClient(Socket socket, String customName) throws IOException {
-        this(socket);
-        this.customName = customName;
     }
 
     public void setCustomName(String customName) {
@@ -70,9 +67,14 @@ public class TcpClient {
         return new Object();
     }
 
-    public void writeToClient(Object o) {
+    public void writeToClient(String out) {
         try {
-            outputStream.writeObject(o);
+            if (usesSecureChannel) {
+                securedOutputStream.write(out.getBytes());
+                securedOutputStream.flush();
+            } else {
+                outputStream.writeObject(out);
+            }
         } catch (IOException ex) {
             System.err.println(
                     "Failed to write object to client.");
@@ -92,8 +94,13 @@ public class TcpClient {
 
     private void setupStreams() {
         try {
-            inputStream = new ObjectInputStream(getSocket().getInputStream());
-            outputStream = new ObjectOutputStream(getSocket().getOutputStream());
+            if (usesSecureChannel) {
+                securedInputStream = new BufferedInputStream(getSocket().getInputStream());
+                securedOutputStream = new BufferedOutputStream(getSocket().getOutputStream());
+            } else {
+                inputStream = new ObjectInputStream(getSocket().getInputStream());
+                outputStream = new ObjectOutputStream(getSocket().getOutputStream());
+            }
         } catch (IOException ex) {
             ex.printStackTrace();
             System.err.println("Failed to setup streams.");
