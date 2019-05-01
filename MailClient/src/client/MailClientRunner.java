@@ -11,16 +11,20 @@ public class MailClientRunner {
     private static final int MIN_PORT = 1;
     private static final int  MAX_PORT = 65535;
     private static final String SECURED_FLAG = "S";
+    private static final String MD5_FLAG = "md5";
     private static final String QUIT = "QUIT";
 
     public static void main(String[] args) {
-        if (args.length != 3) {
-            System.err.println("Invalid argument length; Expected 3 but was given " + args.length + "; see below for valid arguments\n" +
-                    "Expected input: \"java -jar MailClientRunner.jar <server-hostname> <server-port> <ssl-tls-flag>\"\n" +
+        if (args.length != 4) {
+            System.err.println("Invalid argument length; Expected 4 but was given " + args.length + "; see below for valid arguments\n" +
+                    "Expected input: \"java -jar MailClientRunner.jar <server-hostname> <server-port> <ssl-tls-flag> <hash-auth-flag>\"\n" +
                     "\t<server-hostname>: a valid hostname of a server\n" +
                     "\t<server-port>: an integer within the range [1, 65535]\n" +
                     "\t<ssl-tls-flag>: a single character; either 'S' for secure client channel or 'u' for an unsecured client channel\n" +
-                    "\t\t-- If answer cannot be understood channel will opt for secure channel by default"
+                    "\t<hash-auth-flag>: flag to indicate Base64 or Hash MD5 authentication (B64 will be used if answer not understood)\n" +
+                    "\t\tFor Base64: feed b64 to parameter\n" +
+                    "\t\tFor Hash MD5: feed md5 to parameter\n" +
+                    "\t\t-- If answer cannot be understood channel will opt for secure channel by default\n"
             );
             System.exit(1);
         }
@@ -36,6 +40,9 @@ public class MailClientRunner {
         String secureChannelFlag = args[2];
         boolean isChannelSecure = SECURED_FLAG.equalsIgnoreCase(secureChannelFlag);
 
+        String hashFlag = args[3];
+        boolean useHashAuth = MD5_FLAG.equalsIgnoreCase(hashFlag);
+
         System.out.println("Application running (enter 'QUIT' at any time to exit)...");
 
         Scanner scanner = new Scanner(System.in);
@@ -43,7 +50,7 @@ public class MailClientRunner {
             System.out.print("Will you be sending or receiving today? ('s' / 'r'): ");
             String response = scanner.next();
             if (responseIsSend(response)) {
-                startTCPSenderAgent(serverHostname, serverPort, isChannelSecure);
+                startTCPSenderAgent(serverHostname, serverPort, isChannelSecure, useHashAuth);
                 System.exit(0);
             }
 
@@ -70,8 +77,8 @@ public class MailClientRunner {
         }
     }
 
-    private static void startTCPSenderAgent(String host, int port, boolean usesSecureChannel) {
-        TcpAgent tcpAgent = new TcpAgent(host, port, usesSecureChannel);
+    private static void startTCPSenderAgent(String host, int port, boolean usesSecureChannel, boolean usesHashAuth) {
+        TcpAgent tcpAgent = new TcpAgent(host, port, usesSecureChannel, usesHashAuth);
         tcpAgent.run();
     }
 

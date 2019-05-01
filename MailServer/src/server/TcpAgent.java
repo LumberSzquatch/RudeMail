@@ -23,12 +23,15 @@ public class TcpAgent implements Runnable {
     private final static String AUTH = "AUTH";
     private final static String INVALID_CREDENTIALS = "535 Invalid Credentials";
     private final static String USERNAME_CHALLENGE = "334 dXNlcm5hbWU6";
+    private final static String HASH_USERNAME_CHALLENGE = "334 f86ef3eb8e32629d3d04eb94e64252f1";
     private final static String PASSWORD_CHALLENGE = "334 cGFzc3dvcmQ6";
+    private final static String HASH_PASSWORD_CHALLENGE = "334 748867e22058f7e83b64404f987dd8f9";
     private final static String AUTH_SUCCESS = "235 AUTH Success";
     private final static String AUTH_REGISTER = "330 Must Register\nTemporary Password: ";
     private final static String EMAIL_DOMAIN = "@cs447.edu";
 
     private boolean usesSecureChannel;
+    private boolean usesHashAuth;
     private boolean isNewUser;
     private String clientEmail;
     private String encodedEmailString;
@@ -37,9 +40,10 @@ public class TcpAgent implements Runnable {
 
     private String clientIP;
 
-    public TcpAgent(TcpClient tcpClient, boolean usesSecureChannel) {
+    public TcpAgent(TcpClient tcpClient, boolean usesSecureChannel, boolean usesHashAuth) {
         this.tcpClient = tcpClient;
         this.usesSecureChannel = usesSecureChannel;
+        this.usesHashAuth = usesHashAuth;
         this.clientIP = tcpClient.getCustomName();
         this.isNewUser = false;
         this.clientThread = null;
@@ -96,35 +100,58 @@ public class TcpAgent implements Runnable {
                     }
 
                     // AUTH USER Challenge - Lock client in until valid email/username is given or requested QUIT
-                    tcpClient.writeToClient(USERNAME_CHALLENGE);
-                    IncidentManager.log(tcpClient.getSocket().getInetAddress().getHostAddress(),
-                            InetAddress.getLocalHost().getHostAddress(),
-                            AUTH,
-                            USERNAME_CHALLENGE);
+                    if (usesHashAuth) {
+                        tcpClient.writeToClient(HASH_USERNAME_CHALLENGE);
+                        IncidentManager.log(tcpClient.getSocket().getInetAddress().getHostAddress(),
+                                InetAddress.getLocalHost().getHostAddress(),
+                                AUTH,
+                                HASH_USERNAME_CHALLENGE);
 
-                    request = B64Util.decode(getClientRequest());
+                        request = HashAuthorizer.retrieveHashedPassword(getClientRequest());
+                        System.out.println(request);
+                    } else {
+                        tcpClient.writeToClient(USERNAME_CHALLENGE);
+                        IncidentManager.log(tcpClient.getSocket().getInetAddress().getHostAddress(),
+                                InetAddress.getLocalHost().getHostAddress(),
+                                AUTH,
+                                USERNAME_CHALLENGE);
+
+                        request = B64Util.decode(getClientRequest());
+                    }
                     while (!request.contains(EMAIL_DOMAIN)) {
                         terminateIfClientQuit(request);
                         if (clientSocketClosed()) {
                             break;
                         }
                         tcpClient.writeToClient(INVALID_CREDENTIALS + "; Not a valid email");
-                        request = B64Util.decode(getClientRequest());
+                        if (usesHashAuth) {
+                            request = HashAuthorizer.retrieveHashedPassword(getClientRequest());
+                        } else {
+                            request = B64Util.decode(getClientRequest());
+                        }
                     }
 
                     if (clientSocketClosed()) {
                         break;
                     }
                     this.clientEmail = request;
-                    this.encodedEmailString = B64Util.encode(this.clientEmail);
-
+                    if (usesHashAuth) {
+                        this.encodedEmailString = HashAuthorizer.generateHashedPassword(this.clientEmail);
+                    } else {
+                        this.encodedEmailString = B64Util.encode(this.clientEmail);
+                    }
                     // Start registration process if user is not already registered in .user_pass
                     if (!CredentialsManager.isRegisteredUser(encodedEmailString)) {
                         System.out.println("Waiting for connection refresh from client" + tcpClient.getCustomName() + " ...");
-                        this.isNewUser = true; // this might end up being irrelevant
+                        this.isNewUser = true;
                         this.temporaryPassword = CredentialsManager.generateTemporaryPassword();
-                        CredentialsManager.writeUserToMasterFile(this.encodedEmailString, temporaryPassword);
-                        tcpClient.writeToClient(AUTH_REGISTER + temporaryPassword);
+                        if (usesHashAuth) {
+                            CredentialsManager.writeHashedUserToMasterFile(this.encodedEmailString, temporaryPassword);
+                            tcpClient.writeToClient(AUTH_REGISTER + temporaryPassword);
+                        } else {
+                            CredentialsManager.writeUserToMasterFile(this.encodedEmailString, temporaryPassword);
+                            tcpClient.writeToClient(AUTH_REGISTER + temporaryPassword);
+                        }
                         System.out.println("Connection refreshed for client " + tcpClient.getCustomName());
                     }
 
@@ -134,17 +161,30 @@ public class TcpAgent implements Runnable {
 
                     // AUTH PASSWORD Challenge - Lock client in until valid password is given or requested QUIT
                     int loginAttempts = 4;
-                    tcpClient.writeToClient(PASSWORD_CHALLENGE);
-                    IncidentManager.log(tcpClient.getSocket().getInetAddress().getHostAddress(),
-                            InetAddress.getLocalHost().getHostAddress(),
-                            AUTH,
-                            PASSWORD_CHALLENGE);
-                    request = B64Util.decode(getClientRequest());
+                    if (usesHashAuth) {
+                        tcpClient.writeToClient(HASH_PASSWORD_CHALLENGE);
+                        IncidentManager.log(tcpClient.getSocket().getInetAddress().getHostAddress(),
+                                InetAddress.getLocalHost().getHostAddress(),
+                                AUTH,
+                                HASH_PASSWORD_CHALLENGE);
+                        request = HashAuthorizer.retrieveHashedPassword(getClientRequest());
+                    } else {
+                        tcpClient.writeToClient(PASSWORD_CHALLENGE);
+                        IncidentManager.log(tcpClient.getSocket().getInetAddress().getHostAddress(),
+                                InetAddress.getLocalHost().getHostAddress(),
+                                AUTH,
+                                PASSWORD_CHALLENGE);
+                        request = B64Util.decode(getClientRequest());
+                    }
                     if (isNewUser) {
-                        request = CredentialsManager.modifyGeneratedNumber(request);
+                        request = CredentialsManager.getSalt(request);
                         isNewUser = false;
                     }
-                    this.encodedPasswordString = B64Util.encode(request);
+                    if (usesHashAuth) {
+                        this.encodedPasswordString = HashAuthorizer.generateHashedPassword(request);
+                    } else {
+                        this.encodedPasswordString = B64Util.encode(request);
+                    }
 
                     while (!CredentialsManager.passwordValid(this.encodedEmailString, this.encodedPasswordString)) {
                         terminateIfClientQuit(request);
@@ -160,8 +200,13 @@ public class TcpAgent implements Runnable {
                         }
                         tcpClient.writeToClient(INVALID_CREDENTIALS + "; Password does not match what is on file ("
                                 + loginAttempts + " attempts remaining before termination)");
-                        request = B64Util.decode(getClientRequest());
-                        this.encodedPasswordString = B64Util.encode(request);
+                        if (usesHashAuth) {
+                            request = HashAuthorizer.retrieveHashedPassword(getClientRequest());
+                            this.encodedPasswordString = HashAuthorizer.generateHashedPassword(request);
+                        } else {
+                            request = B64Util.decode(getClientRequest());
+                            this.encodedPasswordString = B64Util.encode(request);
+                        }
                     }
 
                     if (clientSocketClosed()) {

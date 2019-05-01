@@ -6,6 +6,7 @@ import java.io.IOException;
 import java.io.ObjectOutputStream;
 import java.io.OutputStream;
 import java.net.Socket;
+import java.security.NoSuchAlgorithmException;
 import java.util.Scanner;
 
 public class TcpAgent implements Runnable {
@@ -18,14 +19,16 @@ public class TcpAgent implements Runnable {
     private String serverHostname;
     private int serverPort;
     private boolean usesSecureChannel;
+    private boolean usesHashAuth;
 
     public static boolean saidHelo = false;
     public static boolean shouldEncodeData = false;
 
-    public TcpAgent(String serverHostname, int serverPort, boolean usesSecureChannel) {
+    public TcpAgent(String serverHostname, int serverPort, boolean usesSecureChannel, boolean usesHashAuth) {
         this.serverHostname = serverHostname;
         this.serverPort = serverPort;
         this.usesSecureChannel = usesSecureChannel;
+        this.usesHashAuth = usesHashAuth;
     }
 
     @Override
@@ -73,7 +76,11 @@ public class TcpAgent implements Runnable {
                         multithreadedClient.setHelo(true);
                     }
                     if (multithreadedClient.shouldDataBeEncoded()) {
-                        multithreadedClient.sendToServer(B64Util.encode(request));
+                        if (usesHashAuth) {
+                            multithreadedClient.sendToServer(HashAuthorizer.generateHashedPassword(request));
+                        } else {
+                            multithreadedClient.sendToServer(B64Util.encode(request));
+                        }
                     } else {
                         multithreadedClient.sendToServer(request);
                         if (request.equalsIgnoreCase(AUTH_REQUEST) && multithreadedClient.saidHelo()) {
@@ -87,6 +94,9 @@ public class TcpAgent implements Runnable {
         } catch (IOException ex) {
             System.err.println("Failed to establish connection with server");
             ex.printStackTrace();
+            System.exit(1);
+        } catch (NoSuchAlgorithmException e) {
+            System.err.println("Failed to hash value for authentication");
             System.exit(1);
         }
     }

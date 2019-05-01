@@ -10,15 +10,12 @@ public class TcpClientManager implements Runnable {
     private final int TCP_PORT;
     private final boolean SERVER_ACTIVE_LISTEN = true;
     private final boolean CHANNEL_SECURE;
+    private final boolean USE_HASH_AUTH;
 
-    public TcpClientManager(final int TCP_PORT) {
-        this.TCP_PORT = TCP_PORT;
-        this.CHANNEL_SECURE = false;
-    }
-
-    public TcpClientManager(final int TCP_PORT, final boolean useSecureChannel) {
+    public TcpClientManager(final int TCP_PORT, final boolean useSecureChannel, final boolean USE_HASH_AUTH) {
         this.TCP_PORT = TCP_PORT;
         this.CHANNEL_SECURE = useSecureChannel;
+        this.USE_HASH_AUTH = USE_HASH_AUTH;
     }
 
     @Override
@@ -37,7 +34,7 @@ public class TcpClientManager implements Runnable {
                 System.out.println("TCP agent listening for clients through secure channel on port " + secureSocket.getLocalPort());
                 while (SERVER_ACTIVE_LISTEN) {
                     TcpClient tcpClient = new TcpClient(secureSocket.accept(), CHANNEL_SECURE);
-                    TcpAgent tcpAgent = new TcpAgent(tcpClient, CHANNEL_SECURE);
+                    TcpAgent tcpAgent = new TcpAgent(tcpClient, CHANNEL_SECURE, USE_HASH_AUTH);
                     Thread clientThread = new Thread(tcpAgent);
                     clientThread.start();
                 }
@@ -46,7 +43,7 @@ public class TcpClientManager implements Runnable {
                 System.out.println("TCP agent listening for incoming clients on port " + serverSocket.getLocalPort() + "; Connection is unsecured!");
                 while (SERVER_ACTIVE_LISTEN) {
                     TcpClient tcpClient = new TcpClient(serverSocket.accept(), CHANNEL_SECURE);
-                    TcpAgent tcpAgent = new TcpAgent(tcpClient, CHANNEL_SECURE);
+                    TcpAgent tcpAgent = new TcpAgent(tcpClient, CHANNEL_SECURE, USE_HASH_AUTH);
                     Thread clientThread = new Thread(tcpAgent);
                     clientThread.start();
                 }
