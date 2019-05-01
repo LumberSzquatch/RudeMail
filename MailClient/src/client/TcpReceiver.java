@@ -33,7 +33,7 @@ public class TcpReceiver implements Runnable {
                         waitToRefreshConnection();
                         System.out.println("Connection Refreshed!\n" +
                                 "To change your password; manually change it via .user_pass file " +
-                                "(subsequent logins after the registration process will require you to add 447 to what your temporary password was");
+                                "(subsequent logins after the registration process will require you to add 447 to what your temporary password was)");
                     }
             }
         } catch (IOException ioe) {
