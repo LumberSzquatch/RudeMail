@@ -9,7 +9,7 @@ public class CredentialsManager {
     private static final String ROOT_DIRECTORY = "db";
     private static final String CREDS_DELIMITER = "/";
 
-    private static final int EXTRA_STEP_NUMBER = 447;
+    private static final int SALT = 447;
 
     private static File masterFile;
 
@@ -124,8 +124,8 @@ public class CredentialsManager {
     }
 
     public static String modifyGeneratedNumber(String fiveDigitInteger) {
-        // Adding 447 to generated value for extra layer of security (or something; sounds like extra steps)
-        int modifiedDigits = Integer.parseInt(fiveDigitInteger) + EXTRA_STEP_NUMBER;
+        // Adding 447 to generated value for extra layer of security (the salt)
+        int modifiedDigits = Integer.parseInt(fiveDigitInteger) + SALT;
         return Integer.toString(modifiedDigits);
     }
 }

@@ -43,7 +43,7 @@ public class TcpAgent implements Runnable {
                 String protocols[] = {"TLSv1.2"};
                 secureSocket.setEnabledCipherSuites(enabledSuites);
                 secureSocket.setEnabledProtocols(protocols);
-                secureSocket.startHandshake();
+                secureSocket.startHandshake(); // todo: need to reapply handshake after each iteraction (?????)
                 new Thread(new TcpReceiver(secureSocket)).start();
                 Scanner scanner = new Scanner(System.in);
 
